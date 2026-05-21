@@ -22,6 +22,8 @@ Route::prefix('auth')->group(function () {
 Route::get('/tournaments', [TournamentController::class, 'index']);
 Route::get('/tournaments/{slug}', [TournamentController::class, 'show']);
 Route::get('/tournaments/{slug}/matches', [TournamentController::class, 'matches']);
+Route::get('/tournaments/{slug}/global-standings', [TournamentController::class, 'globalStandings']);
+Route::get('/tournaments/{slug}/public-quinielas', [TournamentController::class, 'publicQuinielas']);
 
 // Invitations - mixed
 Route::get('/invitations/{token}', [InvitationController::class, 'show']);
