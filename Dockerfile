@@ -1,16 +1,10 @@
-FROM php:8.3-apache
+FROM php:8.3-cli
 
 RUN apt-get update && apt-get install -y \
     git curl libpq-dev libzip-dev unzip zip \
     && docker-php-ext-install pdo pdo_pgsql zip \
-    && a2dismod mpm_event mpm_worker || true \
-    && a2enmod mpm_prefork rewrite \
     && curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer \
     && rm -rf /var/lib/apt/lists/*
-
-ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
-RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf \
-    && sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
 
 WORKDIR /var/www/html
 
@@ -20,12 +14,12 @@ RUN composer install --no-scripts --no-autoloader --no-interaction --no-dev --pr
 COPY . .
 
 RUN composer dump-autoload --optimize \
-    && chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
-    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+    && chown -R www-data:www-data storage bootstrap/cache \
+    && chmod -R 775 storage bootstrap/cache
 
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-EXPOSE 80
+EXPOSE 8000
 
 CMD ["docker-entrypoint.sh"]

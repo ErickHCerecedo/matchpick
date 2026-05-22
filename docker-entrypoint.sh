@@ -5,4 +5,4 @@ php artisan config:cache
 php artisan route:cache
 php artisan migrate --force
 
-apache2-foreground
+php artisan serve --host=0.0.0.0 --port=8000
