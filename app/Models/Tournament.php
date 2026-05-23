@@ -9,13 +9,14 @@ use App\Models\GameMatch;
 
 class Tournament extends Model
 {
-    protected $fillable = ['name', 'slug', 'type', 'season', 'logo_url', 'starts_at', 'ends_at', 'is_active', 'meta'];
+    protected $fillable = ['name', 'slug', 'type', 'season', 'logo_url', 'starts_at', 'ends_at', 'is_active', 'is_custom', 'creator_id', 'meta'];
 
     protected function casts(): array
     {
         return [
             'meta' => 'array',
             'is_active' => 'boolean',
+            'is_custom' => 'boolean',
             'starts_at' => 'date',
             'ends_at' => 'date',
         ];
@@ -34,5 +35,15 @@ class Tournament extends Model
     public function quinielas(): HasMany
     {
         return $this->hasMany(Quiniela::class);
+    }
+
+    public function creator(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(User::class, 'creator_id');
+    }
+
+    public function teams(): HasMany
+    {
+        return $this->hasMany(Team::class);
     }
 }

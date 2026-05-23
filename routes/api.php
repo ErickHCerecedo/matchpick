@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\TournamentController;
+use App\Http\Controllers\CustomTournamentController;
 use App\Http\Controllers\QuinielaController;
 use App\Http\Controllers\PredictionController;
 use App\Http\Controllers\StandingController;
@@ -30,8 +31,22 @@ Route::get('/invitations/{token}', [InvitationController::class, 'show']);
 Route::post('/invitations/{token}/accept', [InvitationController::class, 'accept'])
     ->middleware('auth:sanctum');
 
+// Custom tournaments - public reads
+Route::get('/tournaments/{slug}/teams', [CustomTournamentController::class, 'teams']);
+Route::get('/tournaments/{slug}/rounds', [CustomTournamentController::class, 'rounds']);
+Route::get('/tournaments/{slug}/rounds/{roundId}/matches', [CustomTournamentController::class, 'roundMatches']);
+
 // Authenticated routes
 Route::middleware('auth:sanctum')->group(function () {
+    // Custom tournament management
+    Route::post('/tournaments', [CustomTournamentController::class, 'store']);
+    Route::get('/my-tournaments', [CustomTournamentController::class, 'mine']);
+    Route::post('/tournaments/{slug}/teams', [CustomTournamentController::class, 'addTeam']);
+    Route::delete('/tournaments/{slug}/teams/{teamId}', [CustomTournamentController::class, 'removeTeam']);
+    Route::post('/tournaments/{slug}/rounds', [CustomTournamentController::class, 'addRound']);
+    Route::delete('/tournaments/{slug}/rounds/{roundId}', [CustomTournamentController::class, 'removeRound']);
+    Route::post('/tournaments/{slug}/rounds/{roundId}/matches', [CustomTournamentController::class, 'addMatch']);
+    Route::delete('/tournaments/{slug}/rounds/{roundId}/matches/{matchId}', [CustomTournamentController::class, 'removeMatch']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/me', [AuthController::class, 'me']);
 

@@ -1,0 +1,236 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Resources\TournamentResource;
+use App\Models\GameMatch;
+use App\Models\Round;
+use App\Models\Team;
+use App\Models\Tournament;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+
+class CustomTournamentController extends Controller
+{
+    public function store(Request $request): JsonResponse
+    {
+        $request->validate([
+            'name'       => 'required|string|max:150',
+            'season'     => 'required|string|max:10',
+            'starts_at'  => 'nullable|date',
+            'ends_at'    => 'nullable|date|after_or_equal:starts_at',
+        ]);
+
+        $slug = Str::slug($request->name) . '-' . Str::random(6);
+
+        $tournament = Tournament::create([
+            'name'       => $request->name,
+            'slug'       => $slug,
+            'type'       => 'league',
+            'season'     => $request->season,
+            'starts_at'  => $request->starts_at,
+            'ends_at'    => $request->ends_at,
+            'is_active'  => true,
+            'is_custom'  => true,
+            'creator_id' => $request->user()->id,
+        ]);
+
+        // Auto-create first round
+        Round::create([
+            'tournament_id' => $tournament->id,
+            'name'          => 'Jornada 1',
+            'type'          => 'general',
+            'order'         => 1,
+        ]);
+
+        return response()->json([
+            'data'    => new TournamentResource($tournament->load('creator')),
+            'message' => 'Torneo creado exitosamente.',
+        ], 201);
+    }
+
+    public function mine(Request $request): JsonResponse
+    {
+        $tournaments = Tournament::where('creator_id', $request->user()->id)
+            ->with('creator')
+            ->latest()
+            ->get();
+
+        return response()->json(['data' => TournamentResource::collection($tournaments)]);
+    }
+
+    // ── Teams ─────────────────────────────────────────────────────────────
+
+    public function teams(string $slug): JsonResponse
+    {
+        $tournament = Tournament::where('slug', $slug)->firstOrFail();
+
+        $teams = Team::where('tournament_id', $tournament->id)
+            ->orderBy('name')
+            ->get()
+            ->map(fn($t) => ['id' => $t->id, 'name' => $t->name, 'short_name' => $t->short_name, 'logo_url' => $t->logo_url]);
+
+        return response()->json(['data' => $teams]);
+    }
+
+    public function addTeam(Request $request, string $slug): JsonResponse
+    {
+        $tournament = Tournament::where('slug', $slug)->firstOrFail();
+        $this->authorizeCreator($request, $tournament);
+
+        $request->validate([
+            'name'       => 'required|string|max:100',
+            'short_name' => 'required|string|max:10',
+        ]);
+
+        $team = Team::create([
+            'name'            => $request->name,
+            'short_name'      => strtoupper($request->short_name),
+            'tournament_id'   => $tournament->id,
+            'is_national_team' => false,
+        ]);
+
+        return response()->json([
+            'data'    => ['id' => $team->id, 'name' => $team->name, 'short_name' => $team->short_name, 'logo_url' => $team->logo_url],
+            'message' => 'Equipo agregado.',
+        ], 201);
+    }
+
+    public function removeTeam(Request $request, string $slug, int $teamId): JsonResponse
+    {
+        $tournament = Tournament::where('slug', $slug)->firstOrFail();
+        $this->authorizeCreator($request, $tournament);
+
+        $team = Team::where('id', $teamId)->where('tournament_id', $tournament->id)->firstOrFail();
+        $team->delete();
+
+        return response()->json(['message' => 'Equipo eliminado.']);
+    }
+
+    // ── Rounds ────────────────────────────────────────────────────────────
+
+    public function rounds(string $slug): JsonResponse
+    {
+        $tournament = Tournament::where('slug', $slug)->firstOrFail();
+        $rounds = $tournament->rounds()->withCount('matches')->get()
+            ->map(fn($r) => [
+                'id' => $r->id, 'name' => $r->name, 'type' => $r->type,
+                'order' => $r->order, 'matches_count' => $r->matches_count,
+            ]);
+
+        return response()->json(['data' => $rounds]);
+    }
+
+    public function addRound(Request $request, string $slug): JsonResponse
+    {
+        $tournament = Tournament::where('slug', $slug)->firstOrFail();
+        $this->authorizeCreator($request, $tournament);
+
+        $request->validate(['name' => 'required|string|max:100']);
+
+        $order = $tournament->rounds()->max('order') + 1;
+
+        $round = Round::create([
+            'tournament_id' => $tournament->id,
+            'name'          => $request->name,
+            'type'          => 'general',
+            'order'         => $order,
+        ]);
+
+        return response()->json([
+            'data'    => ['id' => $round->id, 'name' => $round->name, 'type' => $round->type, 'order' => $round->order, 'matches_count' => 0],
+            'message' => 'Jornada agregada.',
+        ], 201);
+    }
+
+    public function removeRound(Request $request, string $slug, int $roundId): JsonResponse
+    {
+        $tournament = Tournament::where('slug', $slug)->firstOrFail();
+        $this->authorizeCreator($request, $tournament);
+
+        $round = Round::where('id', $roundId)->where('tournament_id', $tournament->id)->firstOrFail();
+        $round->delete();
+
+        return response()->json(['message' => 'Jornada eliminada.']);
+    }
+
+    // ── Matches ───────────────────────────────────────────────────────────
+
+    public function addMatch(Request $request, string $slug, int $roundId): JsonResponse
+    {
+        $tournament = Tournament::where('slug', $slug)->firstOrFail();
+        $this->authorizeCreator($request, $tournament);
+
+        $round = Round::where('id', $roundId)->where('tournament_id', $tournament->id)->firstOrFail();
+
+        $request->validate([
+            'home_team_id'   => 'required|integer|exists:teams,id',
+            'away_team_id'   => 'required|integer|exists:teams,id|different:home_team_id',
+            'scheduled_at'   => 'required|date',
+            'venue'          => 'nullable|string|max:200',
+        ]);
+
+        $scheduledAt = $request->scheduled_at;
+
+        $match = GameMatch::create([
+            'round_id'              => $round->id,
+            'home_team_id'          => $request->home_team_id,
+            'away_team_id'          => $request->away_team_id,
+            'scheduled_at'          => $scheduledAt,
+            'prediction_closes_at'  => $scheduledAt,
+            'venue'                 => $request->venue,
+            'status'                => 'scheduled',
+        ]);
+
+        $match->load('homeTeam', 'awayTeam');
+
+        return response()->json([
+            'data' => [
+                'id'           => $match->id,
+                'scheduled_at' => $match->scheduled_at->toIso8601String(),
+                'venue'        => $match->venue,
+                'home_team'    => ['id' => $match->homeTeam->id, 'name' => $match->homeTeam->name, 'short_name' => $match->homeTeam->short_name],
+                'away_team'    => ['id' => $match->awayTeam->id, 'name' => $match->awayTeam->name, 'short_name' => $match->awayTeam->short_name],
+            ],
+            'message' => 'Partido agregado.',
+        ], 201);
+    }
+
+    public function removeMatch(Request $request, string $slug, int $roundId, int $matchId): JsonResponse
+    {
+        $tournament = Tournament::where('slug', $slug)->firstOrFail();
+        $this->authorizeCreator($request, $tournament);
+
+        $round = Round::where('id', $roundId)->where('tournament_id', $tournament->id)->firstOrFail();
+        $match = GameMatch::where('id', $matchId)->where('round_id', $round->id)->firstOrFail();
+        $match->delete();
+
+        return response()->json(['message' => 'Partido eliminado.']);
+    }
+
+    public function roundMatches(string $slug, int $roundId): JsonResponse
+    {
+        $tournament = Tournament::where('slug', $slug)->firstOrFail();
+        $round = Round::where('id', $roundId)->where('tournament_id', $tournament->id)->firstOrFail();
+
+        $matches = $round->matches()->with('homeTeam', 'awayTeam')->orderBy('scheduled_at')->get()
+            ->map(fn($m) => [
+                'id'           => $m->id,
+                'scheduled_at' => $m->scheduled_at->toIso8601String(),
+                'venue'        => $m->venue,
+                'status'       => $m->status,
+                'home_team'    => ['id' => $m->homeTeam->id, 'name' => $m->homeTeam->name, 'short_name' => $m->homeTeam->short_name],
+                'away_team'    => ['id' => $m->awayTeam->id, 'name' => $m->awayTeam->name, 'short_name' => $m->awayTeam->short_name],
+            ]);
+
+        return response()->json(['data' => $matches]);
+    }
+
+    private function authorizeCreator(Request $request, Tournament $tournament): void
+    {
+        if ($tournament->creator_id !== $request->user()->id) {
+            abort(403, 'Solo el creador del torneo puede realizar esta acción.');
+        }
+    }
+}
