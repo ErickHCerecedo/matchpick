@@ -56,7 +56,7 @@ class PredictionController extends Controller
     public function matchPredictions(Request $request, string $slug, int $matchId): JsonResponse
     {
         $quiniela = Quiniela::where('slug', $slug)->firstOrFail();
-        $match = GameGameMatch::findOrFail($matchId);
+        $match = GameMatch::findOrFail($matchId);
 
         // Only show after match has started
         if ($match->scheduled_at->isFuture()) {
