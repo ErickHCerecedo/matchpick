@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use App\Models\Match as GameMatch;
 
 class Tournament extends Model
 {
@@ -27,7 +28,7 @@ class Tournament extends Model
 
     public function matches(): HasManyThrough
     {
-        return $this->hasManyThrough(Match::class, Round::class);
+        return $this->hasManyThrough(GameMatch::class, Round::class);
     }
 
     public function quinielas(): HasMany

@@ -6,7 +6,7 @@ use App\Http\Requests\CreateQuinielaRequest;
 use App\Http\Requests\UpdateQuinielaRequest;
 use App\Http\Resources\QuinielaResource;
 use App\Http\Resources\MatchResource;
-use App\Models\Match;
+use App\Models\Match as GameMatch;
 use App\Models\Quiniela;
 use App\Models\Standing;
 use Illuminate\Http\JsonResponse;

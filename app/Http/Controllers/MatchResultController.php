@@ -3,14 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Jobs\CalculateScoresJob;
-use App\Models\Match;
+use App\Models\Match as GameMatch;
 use App\Models\MatchResult;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class MatchResultController extends Controller
 {
-    public function store(Request $request, Match $match): JsonResponse
+    public function store(Request $request, GameMatch $match): JsonResponse
     {
         if (!$request->user()->is_admin) {
             return response()->json(['message' => 'Unauthorized.'], 403);

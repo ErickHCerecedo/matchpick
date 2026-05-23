@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\BulkPredictionRequest;
-use App\Models\Match;
+use App\Models\Match as GameMatch;
 use App\Models\Prediction;
 use App\Models\Quiniela;
 use Illuminate\Http\JsonResponse;
@@ -25,7 +25,7 @@ class PredictionController extends Controller
         $errors = [];
 
         foreach ($request->predictions as $item) {
-            $match = Match::find($item['match_id']);
+            $match = GameMatch::find($item['match_id']);
 
             if (!$match || !$match->isPredictionOpen()) {
                 $errors[] = ['match_id' => $item['match_id'], 'reason' => 'Predictions are closed for this match.'];
@@ -56,7 +56,7 @@ class PredictionController extends Controller
     public function matchPredictions(Request $request, string $slug, int $matchId): JsonResponse
     {
         $quiniela = Quiniela::where('slug', $slug)->firstOrFail();
-        $match = Match::findOrFail($matchId);
+        $match = GameGameMatch::findOrFail($matchId);
 
         // Only show after match has started
         if ($match->scheduled_at->isFuture()) {

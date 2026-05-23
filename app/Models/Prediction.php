@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use App\Models\Match as GameMatch;
 
 class Prediction extends Model
 {
@@ -12,6 +13,6 @@ class Prediction extends Model
 
     public function user(): BelongsTo { return $this->belongsTo(User::class); }
     public function quiniela(): BelongsTo { return $this->belongsTo(Quiniela::class); }
-    public function match(): BelongsTo { return $this->belongsTo(Match::class); }
+    public function match(): BelongsTo { return $this->belongsTo(GameMatch::class); }
     public function score(): HasOne { return $this->hasOne(Score::class); }
 }

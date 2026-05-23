@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\Match as GameMatch;
 
 class MatchResult extends Model
 {
@@ -25,6 +26,6 @@ class MatchResult extends Model
         });
     }
 
-    public function match(): BelongsTo { return $this->belongsTo(Match::class); }
+    public function match(): BelongsTo { return $this->belongsTo(GameMatch::class); }
     public function scores(): HasMany { return $this->hasMany(Score::class); }
 }

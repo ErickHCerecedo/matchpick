@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\Match as GameMatch;
 
 class Round extends Model
 {
@@ -23,6 +24,6 @@ class Round extends Model
 
     public function matches(): HasMany
     {
-        return $this->hasMany(Match::class)->orderBy('scheduled_at');
+        return $this->hasMany(GameMatch::class)->orderBy('scheduled_at');
     }
 }

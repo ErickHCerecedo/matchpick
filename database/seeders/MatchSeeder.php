@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\Match;
+use App\Models\Match as GameMatch;
 use App\Models\Round;
 use App\Models\Team;
 use App\Models\Tournament;
@@ -125,7 +125,7 @@ class MatchSeeder extends Seeder
                 $time = $kickoffTimes[$matchIndex % count($kickoffTimes)];
                 $scheduledAt = $date . ' ' . $time;
 
-                Match::firstOrCreate(
+                GameMatch::firstOrCreate(
                     [
                         'round_id' => $round->id,
                         'home_team_id' => $homeTeam->id,
@@ -141,6 +141,6 @@ class MatchSeeder extends Seeder
             }
         }
 
-        $this->command->info('Match seeder completed. ' . Match::count() . ' matches created.');
+        $this->command->info('Match seeder completed. ' . GameMatch::count() . ' matches created.');
     }
 }
