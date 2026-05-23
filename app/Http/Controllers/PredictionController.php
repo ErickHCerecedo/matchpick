@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\BulkPredictionRequest;
-use App\Models\Match as GameMatch;
+use App\Models\GameMatch;
 use App\Models\Prediction;
 use App\Models\Quiniela;
 use Illuminate\Http\JsonResponse;

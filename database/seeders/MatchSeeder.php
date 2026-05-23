@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\Match as GameMatch;
+use App\Models\GameMatch;
 use App\Models\Round;
 use App\Models\Team;
 use App\Models\Tournament;

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Jobs\CalculateScoresJob;
-use App\Models\Match as GameMatch;
+use App\Models\GameMatch;
 use App\Models\MatchResult;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
