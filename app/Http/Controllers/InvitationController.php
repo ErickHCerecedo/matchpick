@@ -38,36 +38,71 @@ class InvitationController extends Controller
 
     public function show(string $token): JsonResponse
     {
-        $invitation = Invitation::where('token', $token)->with('quiniela.tournament')->firstOrFail();
+        $invitation = Invitation::where('token', $token)
+            ->with(['quiniela.tournament', 'quiniela.creator', 'quiniela.participants'])
+            ->firstOrFail();
 
         if ($invitation->status === 'expired' || $invitation->expires_at->isPast()) {
-            return response()->json(['message' => 'Invitation has expired.'], 410);
+            return response()->json(['message' => 'Esta invitación ha expirado.'], 410);
         }
 
-        return response()->json(['data' => $invitation]);
+        $quiniela = $invitation->quiniela;
+
+        return response()->json([
+            'data' => [
+                'token'      => $invitation->token,
+                'status'     => $invitation->status,
+                'expires_at' => $invitation->expires_at->toIso8601String(),
+                'quiniela'   => [
+                    'id'                 => $quiniela->id,
+                    'name'               => $quiniela->name,
+                    'slug'               => $quiniela->slug,
+                    'type'               => $quiniela->type,
+                    'participants_count' => $quiniela->participants->count(),
+                    'tournament'         => [
+                        'id'   => $quiniela->tournament->id,
+                        'name' => $quiniela->tournament->name,
+                        'slug' => $quiniela->tournament->slug,
+                    ],
+                    'creator' => $quiniela->creator ? [
+                        'id'         => $quiniela->creator->id,
+                        'name'       => $quiniela->creator->name,
+                        'avatar_url' => $quiniela->creator->avatar_url,
+                    ] : null,
+                ],
+            ],
+        ]);
     }
 
     public function accept(Request $request, string $token): JsonResponse
     {
-        $invitation = Invitation::valid()->where('token', $token)->with('quiniela')->firstOrFail();
-
-        if (!$invitation) {
-            return response()->json(['message' => 'Invalid or expired invitation.'], 410);
-        }
+        $invitation = Invitation::where('token', $token)
+            ->where('expires_at', '>', now())
+            ->where('status', 'pending')
+            ->with('quiniela')
+            ->firstOrFail();
 
         $user = $request->user();
         $quiniela = $invitation->quiniela;
 
-        // Already a participant
+        // Already a participant — return success so the frontend redirects
         if ($quiniela->participants()->where('user_id', $user->id)->exists()) {
-            return response()->json(['message' => 'You are already a participant.'], 409);
+            return response()->json([
+                'message' => 'Ya eres participante de esta quiniela.',
+                'data'    => ['slug' => $quiniela->slug],
+            ]);
         }
 
         $quiniela->participants()->attach($user->id, ['role' => 'participant']);
-        Standing::create(['quiniela_id' => $quiniela->id, 'user_id' => $user->id]);
+        Standing::firstOrCreate(
+            ['quiniela_id' => $quiniela->id, 'user_id' => $user->id]
+        );
 
         $invitation->update(['status' => 'accepted']);
 
-        return response()->json(['message' => 'Joined quiniela successfully.', 'data' => ['slug' => $quiniela->slug]]);
+        return response()->json([
+            'message' => '¡Te uniste a la quiniela exitosamente!',
+            'data'    => ['slug' => $quiniela->slug],
+        ]);
     }
 }
