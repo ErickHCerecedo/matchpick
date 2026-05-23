@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Http\Resources\TournamentResource;
-use App\Http\Resources\MatchResource;
 use App\Models\Tournament;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -42,7 +41,31 @@ class TournamentController extends Controller
 
         $data = $rounds->map(fn($round) => [
             'round' => $round->only('id', 'name', 'type', 'order'),
-            'matches' => MatchResource::collection($round->matches),
+            'matches' => $round->matches->map(fn($match) => [
+                'id'                   => $match->id,
+                'scheduled_at'         => $match->scheduled_at?->toIso8601String(),
+                'prediction_closes_at' => $match->prediction_closes_at?->toIso8601String(),
+                'venue'                => $match->venue,
+                'status'               => $match->status,
+                'is_prediction_open'   => $match->isPredictionOpen(),
+                'home_team'            => $match->homeTeam ? [
+                    'id'         => $match->homeTeam->id,
+                    'name'       => $match->homeTeam->name,
+                    'short_name' => $match->homeTeam->short_name,
+                    'flag_url'   => $match->homeTeam->country?->flag_url,
+                ] : null,
+                'away_team'            => $match->awayTeam ? [
+                    'id'         => $match->awayTeam->id,
+                    'name'       => $match->awayTeam->name,
+                    'short_name' => $match->awayTeam->short_name,
+                    'flag_url'   => $match->awayTeam->country?->flag_url,
+                ] : null,
+                'result'               => $match->result ? [
+                    'home_score' => $match->result->home_score,
+                    'away_score' => $match->result->away_score,
+                    'winner'     => $match->result->winner,
+                ] : null,
+            ]),
         ]);
 
         return response()->json(['data' => $data]);
