@@ -24,8 +24,8 @@ class GameMatch extends Model
     public function round(): BelongsTo { return $this->belongsTo(Round::class); }
     public function homeTeam(): BelongsTo { return $this->belongsTo(Team::class, 'home_team_id'); }
     public function awayTeam(): BelongsTo { return $this->belongsTo(Team::class, 'away_team_id'); }
-    public function result(): HasOne { return $this->hasOne(MatchResult::class); }
-    public function predictions(): HasMany { return $this->hasMany(Prediction::class); }
+    public function result(): HasOne { return $this->hasOne(MatchResult::class, 'match_id'); }
+    public function predictions(): HasMany { return $this->hasMany(Prediction::class, 'match_id'); }
 
     public function scopeOpen(Builder $query): Builder
     {
