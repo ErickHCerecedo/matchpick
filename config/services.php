@@ -27,4 +27,9 @@ return [
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
         'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
+
+    'apifootball' => [
+        'key' => env('APIFOOTBALL_KEY', ''),
+        'base_url' => 'https://v3.football.api-sports.io',
+    ],
 ];

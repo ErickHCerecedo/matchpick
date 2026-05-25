@@ -9,6 +9,7 @@ use App\Http\Controllers\PredictionController;
 use App\Http\Controllers\StandingController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\MatchResultController;
+use App\Http\Controllers\QuinielaResultController;
 use Illuminate\Support\Facades\Route;
 
 // Auth - public
@@ -56,6 +57,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/quinielas/{slug}/predictions', [PredictionController::class, 'bulkUpsert']);
     Route::get('/quinielas/{slug}/predictions/{matchId}', [PredictionController::class, 'matchPredictions']);
     Route::post('/quinielas/{slug}/invitations', [InvitationController::class, 'store']);
+    Route::post('/quinielas/{slug}/matches/{matchId}/result', [QuinielaResultController::class, 'store']);
+    Route::post('/quinielas/{slug}/sync-results', [QuinielaResultController::class, 'syncFromApi']);
 });
 
 // Admin routes
