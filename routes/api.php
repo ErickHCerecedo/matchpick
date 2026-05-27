@@ -10,6 +10,7 @@ use App\Http\Controllers\StandingController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\MatchResultController;
 use App\Http\Controllers\QuinielaResultController;
+use App\Http\Controllers\Admin\TournamentAdminController;
 use Illuminate\Support\Facades\Route;
 
 // Auth - public
@@ -62,6 +63,8 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 // Admin routes
-Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
+Route::middleware(['auth:sanctum', 'is_admin'])->prefix('admin')->group(function () {
     Route::post('/matches/{match}/results', [MatchResultController::class, 'store']);
+    Route::get('/tournaments', [TournamentAdminController::class, 'index']);
+    Route::patch('/tournaments/{tournament}', [TournamentAdminController::class, 'update']);
 });
