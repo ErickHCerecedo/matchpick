@@ -82,12 +82,14 @@ class CustomTournamentController extends Controller
         $request->validate([
             'name'       => 'required|string|max:100',
             'short_name' => 'required|string|max:10',
+            'logo_url'   => 'nullable|string|max:500',
         ]);
 
         $team = Team::create([
-            'name'            => $request->name,
-            'short_name'      => strtoupper($request->short_name),
-            'tournament_id'   => $tournament->id,
+            'name'             => $request->name,
+            'short_name'       => strtoupper($request->short_name),
+            'logo_url'         => $request->logo_url,
+            'tournament_id'    => $tournament->id,
             'is_national_team' => false,
         ]);
 
@@ -95,6 +97,31 @@ class CustomTournamentController extends Controller
             'data'    => ['id' => $team->id, 'name' => $team->name, 'short_name' => $team->short_name, 'logo_url' => $team->logo_url],
             'message' => 'Equipo agregado.',
         ], 201);
+    }
+
+    public function updateTeam(Request $request, string $slug, int $teamId): JsonResponse
+    {
+        $tournament = Tournament::where('slug', $slug)->firstOrFail();
+        $this->authorizeCreator($request, $tournament);
+
+        $data = $request->validate([
+            'name'       => 'sometimes|string|max:100',
+            'short_name' => 'sometimes|string|max:10',
+            'logo_url'   => 'nullable|string|max:500',
+        ]);
+
+        $team = Team::where('id', $teamId)->where('tournament_id', $tournament->id)->firstOrFail();
+
+        if (isset($data['name']))       $team->name       = $data['name'];
+        if (isset($data['short_name'])) $team->short_name = strtoupper($data['short_name']);
+        if (array_key_exists('logo_url', $data)) $team->logo_url = $data['logo_url'];
+
+        $team->save();
+
+        return response()->json([
+            'data'    => ['id' => $team->id, 'name' => $team->name, 'short_name' => $team->short_name, 'logo_url' => $team->logo_url],
+            'message' => 'Equipo actualizado.',
+        ]);
     }
 
     public function removeTeam(Request $request, string $slug, int $teamId): JsonResponse
@@ -195,6 +222,42 @@ class CustomTournamentController extends Controller
             ],
             'message' => 'Partido agregado.',
         ], 201);
+    }
+
+    public function updateMatch(Request $request, string $slug, int $roundId, int $matchId): JsonResponse
+    {
+        $tournament = Tournament::where('slug', $slug)->firstOrFail();
+        $this->authorizeCreator($request, $tournament);
+
+        $round = Round::where('id', $roundId)->where('tournament_id', $tournament->id)->firstOrFail();
+        $match = GameMatch::where('id', $matchId)->where('round_id', $round->id)->firstOrFail();
+
+        $data = $request->validate([
+            'home_team_id' => 'sometimes|integer|exists:teams,id',
+            'away_team_id' => 'sometimes|integer|exists:teams,id|different:home_team_id',
+            'scheduled_at' => 'sometimes|date',
+            'venue'        => 'nullable|string|max:200',
+            'status'       => 'sometimes|in:scheduled,in_progress,finished,cancelled',
+        ]);
+
+        if (isset($data['scheduled_at'])) {
+            $data['prediction_closes_at'] = $data['scheduled_at'];
+        }
+
+        $match->update($data);
+        $match->load('homeTeam', 'awayTeam');
+
+        return response()->json([
+            'data' => [
+                'id'           => $match->id,
+                'scheduled_at' => $match->scheduled_at->toIso8601String(),
+                'venue'        => $match->venue,
+                'status'       => $match->status,
+                'home_team'    => ['id' => $match->homeTeam->id, 'name' => $match->homeTeam->name, 'short_name' => $match->homeTeam->short_name],
+                'away_team'    => ['id' => $match->awayTeam->id, 'name' => $match->awayTeam->name, 'short_name' => $match->awayTeam->short_name],
+            ],
+            'message' => 'Partido actualizado.',
+        ]);
     }
 
     public function removeMatch(Request $request, string $slug, int $roundId, int $matchId): JsonResponse

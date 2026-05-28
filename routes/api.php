@@ -44,10 +44,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/tournaments', [CustomTournamentController::class, 'store']);
     Route::get('/my-tournaments', [CustomTournamentController::class, 'mine']);
     Route::post('/tournaments/{slug}/teams', [CustomTournamentController::class, 'addTeam']);
+    Route::patch('/tournaments/{slug}/teams/{teamId}', [CustomTournamentController::class, 'updateTeam']);
     Route::delete('/tournaments/{slug}/teams/{teamId}', [CustomTournamentController::class, 'removeTeam']);
     Route::post('/tournaments/{slug}/rounds', [CustomTournamentController::class, 'addRound']);
     Route::delete('/tournaments/{slug}/rounds/{roundId}', [CustomTournamentController::class, 'removeRound']);
     Route::post('/tournaments/{slug}/rounds/{roundId}/matches', [CustomTournamentController::class, 'addMatch']);
+    Route::patch('/tournaments/{slug}/rounds/{roundId}/matches/{matchId}', [CustomTournamentController::class, 'updateMatch']);
     Route::delete('/tournaments/{slug}/rounds/{roundId}/matches/{matchId}', [CustomTournamentController::class, 'removeMatch']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/me', [AuthController::class, 'me']);
