@@ -59,6 +59,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/quinielas/{slug}/matches', [QuinielaController::class, 'matches']);
     Route::post('/quinielas/{slug}/predictions', [PredictionController::class, 'bulkUpsert']);
     Route::get('/quinielas/{slug}/predictions/{matchId}', [PredictionController::class, 'matchPredictions']);
+    Route::get('/quinielas/{slug}/participants/{userId}/breakdown', [PredictionController::class, 'participantBreakdown']);
     Route::post('/quinielas/{slug}/invitations', [InvitationController::class, 'store']);
     Route::post('/quinielas/{slug}/matches/{matchId}/result', [QuinielaResultController::class, 'store']);
     Route::post('/quinielas/{slug}/sync-results', [QuinielaResultController::class, 'syncFromApi']);

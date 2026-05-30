@@ -66,10 +66,42 @@ class CustomTournamentController extends Controller
     {
         $tournament = Tournament::where('slug', $slug)->firstOrFail();
 
-        $teams = Team::where('tournament_id', $tournament->id)
-            ->orderBy('name')
-            ->get()
-            ->map(fn($t) => ['id' => $t->id, 'name' => $t->name, 'short_name' => $t->short_name, 'logo_url' => $t->logo_url]);
+        if ($tournament->is_custom) {
+            $teams = Team::where('tournament_id', $tournament->id)
+                ->orderBy('name')
+                ->get()
+                ->map(fn($t) => [
+                    'id'         => $t->id,
+                    'name'       => $t->name,
+                    'short_name' => $t->short_name,
+                    'logo_url'   => $t->logo_url,
+                ]);
+        } else {
+            // National teams are not linked via tournament_id — resolve them
+            // through the rounds → matches graph of this tournament.
+            $teamIds = \DB::table('matches')
+                ->join('rounds', 'matches.round_id', '=', 'rounds.id')
+                ->where('rounds.tournament_id', $tournament->id)
+                ->whereNotNull('matches.home_team_id')
+                ->whereNotNull('matches.away_team_id')
+                ->selectRaw('home_team_id, away_team_id')
+                ->get()
+                ->flatMap(fn($row) => [$row->home_team_id, $row->away_team_id])
+                ->unique()
+                ->values();
+
+            $teams = Team::with('country')
+                ->whereIn('id', $teamIds)
+                ->orderBy('name')
+                ->get()
+                ->map(fn($t) => [
+                    'id'         => $t->id,
+                    'name'       => $t->name,
+                    'short_name' => $t->short_name,
+                    // National teams store the flag on their country, not on team.logo_url
+                    'logo_url'   => $t->logo_url ?? $t->country?->flag_url,
+                ]);
+        }
 
         return response()->json(['data' => $teams]);
     }
