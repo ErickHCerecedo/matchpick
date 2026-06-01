@@ -62,9 +62,19 @@ class CountrySeeder extends Seeder
             ['name' => 'Egypt', 'iso_code' => 'EGY', 'iso2_code' => 'eg'],
             // OFC (1)
             ['name' => 'New Zealand', 'iso_code' => 'NZL', 'iso2_code' => 'nz'],
-            // Playoff spots (placeholders)
+            // Additional qualified teams (added for WC 2026)
             ['name' => 'Ukraine', 'iso_code' => 'UKR', 'iso2_code' => 'ua'],
             ['name' => 'Paraguay', 'iso_code' => 'PAR', 'iso2_code' => 'py'],
+            ['name' => 'South Africa', 'iso_code' => 'RSA', 'iso2_code' => 'za'],
+            ['name' => 'Czech Republic', 'iso_code' => 'CZE', 'iso2_code' => 'cz'],
+            ['name' => 'Bosnia and Herzegovina', 'iso_code' => 'BIH', 'iso2_code' => 'ba'],
+            ['name' => 'Haiti', 'iso_code' => 'HAI', 'iso2_code' => 'ht'],
+            ['name' => 'Curacao', 'iso_code' => 'CUW', 'iso2_code' => 'cw'],
+            ['name' => 'Sweden', 'iso_code' => 'SWE', 'iso2_code' => 'se'],
+            ['name' => 'Cape Verde', 'iso_code' => 'CPV', 'iso2_code' => 'cv'],
+            ['name' => 'Norway', 'iso_code' => 'NOR', 'iso2_code' => 'no'],
+            ['name' => 'Iraq', 'iso_code' => 'IRQ', 'iso2_code' => 'iq'],
+            ['name' => 'DR Congo', 'iso_code' => 'COD', 'iso2_code' => 'cd'],
         ];
 
         foreach ($countries as $country) {
