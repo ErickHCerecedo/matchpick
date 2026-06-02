@@ -11,6 +11,7 @@ use App\Models\Quiniela;
 use App\Models\Standing;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 class QuinielaController extends Controller
 {
@@ -33,26 +34,21 @@ class QuinielaController extends Controller
         }
 
         $quiniela = Quiniela::create([
-            'creator_id' => $user->id,
-            'tournament_id' => $request->tournament_id,
-            'name' => $request->name,
-            'slug' => Quiniela::generateSlug($request->name),
-            'description' => $request->description,
-            'type' => $request->type ?? 'private',
+            'creator_id'       => $user->id,
+            'tournament_id'    => $request->tournament_id,
+            'name'             => $request->name,
+            'slug'             => Quiniela::generateSlug($request->name),
+            'description'      => $request->description,
+            'type'             => $request->type ?? 'private',
             'max_participants' => $request->max_participants,
         ]);
 
-        // Creator joins as admin
         $quiniela->participants()->attach($user->id, ['role' => 'admin']);
-
-        // Create standing row for creator
         Standing::create(['quiniela_id' => $quiniela->id, 'user_id' => $user->id]);
-
-        // Increment counter
         $user->increment('quinielas_created_count');
 
         return response()->json([
-            'data' => new QuinielaResource($quiniela->load(['tournament', 'creator'])),
+            'data'    => new QuinielaResource($quiniela->load(['tournament', 'creator'])),
             'message' => 'Quiniela created successfully.',
         ], 201);
     }
@@ -76,21 +72,129 @@ class QuinielaController extends Controller
         return response()->json(['data' => new QuinielaResource($quiniela)]);
     }
 
+    // ── Deletion with safety rules ──────────────────────────────────────────
+
+    /**
+     * Execute deletion. Rules:
+     *  - Pre-tournament (> 5 days before start): admin can delete freely.
+     *  - Post-tournament (> 5 days after end): admin can delete freely.
+     *  - Active: unanimous vote from all participants required.
+     */
     public function destroy(Request $request, string $slug): JsonResponse
     {
-        $quiniela = Quiniela::where('slug', $slug)->firstOrFail();
+        $quiniela = Quiniela::where('slug', $slug)
+            ->with(['tournament', 'participants'])
+            ->firstOrFail();
+
         $this->authorizeAdmin($request, $quiniela);
+
+        $now      = Carbon::now();
+        $startsAt = Carbon::parse($quiniela->tournament->starts_at);
+        $endsAt   = Carbon::parse($quiniela->tournament->ends_at);
+
+        $preWindow  = $now->copy()->addDays(5)->lt($startsAt);
+        $postWindow = $now->copy()->subDays(5)->gt($endsAt);
+
+        if (!$preWindow && !$postWindow) {
+            $participantsCount = $quiniela->participants()->count();
+            $votesCount        = $quiniela->deleteVotes()->count();
+
+            if ($votesCount < $participantsCount) {
+                return response()->json([
+                    'message'            => 'Se requiere el acuerdo de todos los participantes para eliminar.',
+                    'votes_count'        => $votesCount,
+                    'participants_count' => $participantsCount,
+                ], 422);
+            }
+        }
 
         $quiniela->delete();
         $request->user()->decrement('quinielas_created_count');
 
-        return response()->json(['message' => 'Quiniela deleted.']);
+        return response()->json(['message' => 'Quiniela eliminada correctamente.']);
     }
+
+    /** Returns the current deletion-vote status for the authenticated participant. */
+    public function deleteStatus(Request $request, string $slug): JsonResponse
+    {
+        $quiniela = Quiniela::where('slug', $slug)
+            ->with(['tournament', 'participants'])
+            ->firstOrFail();
+
+        if (!$quiniela->participants()->where('user_id', $request->user()->id)->exists()) {
+            abort(403, 'No eres participante de esta quiniela.');
+        }
+
+        $now      = Carbon::now();
+        $startsAt = Carbon::parse($quiniela->tournament->starts_at);
+        $endsAt   = Carbon::parse($quiniela->tournament->ends_at);
+
+        $preWindow  = $now->copy()->addDays(5)->lt($startsAt);
+        $postWindow = $now->copy()->subDays(5)->gt($endsAt);
+
+        $reason = match (true) {
+            $preWindow  => 'pre_tournament',
+            $postWindow => 'post_tournament',
+            default     => 'active',
+        };
+
+        $participantsCount = $quiniela->participants()->count();
+        $votesCount        = $quiniela->deleteVotes()->count();
+        $myVote            = $quiniela->deleteVotes()->where('user_id', $request->user()->id)->exists();
+
+        // Check whether the admin has cast a vote (marks that the admin initiated deletion)
+        $adminUser  = $quiniela->participants()->wherePivot('role', 'admin')->first();
+        $adminVoted = $adminUser
+            ? $quiniela->deleteVotes()->where('user_id', $adminUser->id)->exists()
+            : false;
+
+        return response()->json([
+            'data' => [
+                'can_delete_freely'  => $preWindow || $postWindow,
+                'reason'             => $reason,
+                'votes_count'        => $votesCount,
+                'participants_count' => $participantsCount,
+                'my_vote'            => $myVote,
+                'admin_voted'        => $adminVoted,
+                'can_delete'         => ($preWindow || $postWindow) || ($votesCount >= $participantsCount),
+            ],
+        ]);
+    }
+
+    /** Cast (or renew) the authenticated user's vote to delete this quiniela. */
+    public function castDeleteVote(Request $request, string $slug): JsonResponse
+    {
+        $quiniela = Quiniela::where('slug', $slug)->firstOrFail();
+
+        if (!$quiniela->participants()->where('user_id', $request->user()->id)->exists()) {
+            abort(403, 'No eres participante de esta quiniela.');
+        }
+
+        $quiniela->deleteVotes()->firstOrCreate(['user_id' => $request->user()->id]);
+
+        return response()->json([
+            'message'            => 'Voto registrado.',
+            'votes_count'        => $quiniela->deleteVotes()->count(),
+            'participants_count' => $quiniela->participants()->count(),
+        ]);
+    }
+
+    /** Revoke the authenticated user's vote to delete. */
+    public function revokeDeleteVote(Request $request, string $slug): JsonResponse
+    {
+        $quiniela = Quiniela::where('slug', $slug)->firstOrFail();
+
+        $quiniela->deleteVotes()->where('user_id', $request->user()->id)->delete();
+
+        return response()->json(['message' => 'Voto revocado.']);
+    }
+
+    // ── Matches ─────────────────────────────────────────────────────────────
 
     public function matches(Request $request, string $slug): JsonResponse
     {
         $quiniela = Quiniela::where('slug', $slug)->firstOrFail();
-        $user = $request->user();
+        $user     = $request->user();
 
         $rounds = $quiniela->tournament->rounds()->with([
             'matches' => function ($q) use ($user, $quiniela) {
@@ -105,7 +209,7 @@ class QuinielaController extends Controller
         ])->get();
 
         $data = $rounds->map(fn($round) => [
-            'round' => $round->only('id', 'name', 'type', 'order'),
+            'round'   => $round->only('id', 'name', 'type', 'order'),
             'matches' => $round->matches->map(fn($match) => array_merge(
                 (new MatchResource($match))->resolve(),
                 ['my_prediction' => $match->predictions->first()]
@@ -114,6 +218,8 @@ class QuinielaController extends Controller
 
         return response()->json(['data' => $data]);
     }
+
+    // ── Helpers ─────────────────────────────────────────────────────────────
 
     private function authorizeAdmin(Request $request, Quiniela $quiniela): void
     {

@@ -39,6 +39,7 @@ class Quiniela extends Model
     public function invitations(): HasMany { return $this->hasMany(Invitation::class); }
     public function predictions(): HasMany { return $this->hasMany(Prediction::class); }
     public function standings(): HasMany { return $this->hasMany(Standing::class)->orderByDesc('total_points'); }
+    public function deleteVotes(): HasMany { return $this->hasMany(QuinielaDeleteVote::class); }
 
     public function scopeActive(Builder $query): Builder { return $query->where('is_active', true); }
 }

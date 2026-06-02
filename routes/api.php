@@ -63,6 +63,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/quinielas/{slug}/invitations', [InvitationController::class, 'store']);
     Route::post('/quinielas/{slug}/matches/{matchId}/result', [QuinielaResultController::class, 'store']);
     Route::post('/quinielas/{slug}/sync-results', [QuinielaResultController::class, 'syncFromApi']);
+    // Deletion safety: status + unanimous vote endpoints
+    Route::get('/quinielas/{slug}/delete-status', [QuinielaController::class, 'deleteStatus']);
+    Route::post('/quinielas/{slug}/delete-votes', [QuinielaController::class, 'castDeleteVote']);
+    Route::delete('/quinielas/{slug}/delete-votes', [QuinielaController::class, 'revokeDeleteVote']);
 });
 
 // Admin routes
