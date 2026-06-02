@@ -29,6 +29,12 @@ class MatchSeeder extends Seeder
     {
         $tournament = Tournament::where('slug', 'world-cup-2026')->firstOrFail();
 
+        // Guard: if matches already exist, do not overwrite live data.
+        if (GameMatch::whereHas('round', fn($q) => $q->where('tournament_id', $tournament->id))->exists()) {
+            $this->command?->info('MatchSeeder: matches already exist — skipping to protect live data.');
+            return;
+        }
+
         $rounds = Round::where('tournament_id', $tournament->id)->get()->keyBy('name');
         $teams  = Team::with('country')->get()->keyBy(fn($t) => $t->country?->iso_code);
 
@@ -209,17 +215,17 @@ class MatchSeeder extends Seeder
             $awayTeam = $teams[$awayCode] ?? null;
 
             if (!$round) {
-                $this->command->warn("Round not found: {$roundName}");
+                $this->command?->warn("Round not found: {$roundName}");
                 $skipped++;
                 continue;
             }
             if (!$homeTeam) {
-                $this->command->warn("Team not found: {$homeCode}");
+                $this->command?->warn("Team not found: {$homeCode}");
                 $skipped++;
                 continue;
             }
             if (!$awayTeam) {
-                $this->command->warn("Team not found: {$awayCode}");
+                $this->command?->warn("Team not found: {$awayCode}");
                 $skipped++;
                 continue;
             }
@@ -241,7 +247,7 @@ class MatchSeeder extends Seeder
             $match->wasRecentlyCreated ? $created++ : $skipped++;
         }
 
-        $this->command->info("MatchSeeder done — {$created} created, {$skipped} already existed.");
-        $this->command->info('Total group stage matches in DB: ' . GameMatch::whereHas('round', fn($q) => $q->where('tournament_id', $tournament->id))->count());
+        $this->command?->info("MatchSeeder done — {$created} created, {$skipped} already existed.");
+        $this->command?->info('Total group stage matches in DB: ' . GameMatch::whereHas('round', fn($q) => $q->where('tournament_id', $tournament->id))->count());
     }
 }
