@@ -36,6 +36,6 @@ class GoogleAuthController extends Controller
 
         $token = $user->createToken('google_token')->plainTextToken;
 
-        return redirect(env('FRONTEND_URL') . '/auth/callback?token=' . $token);
+        return redirect(env('FRONTEND_URL') . '/auth/callback?token=' . urlencode($token));
     }
 }
