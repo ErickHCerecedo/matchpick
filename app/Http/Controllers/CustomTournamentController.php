@@ -3,7 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Http\Resources\TournamentResource;
+use App\Jobs\CalculateScoresJob;
+use App\Jobs\RecalculateMatchScoresJob;
 use App\Models\GameMatch;
+use App\Models\MatchResult;
 use App\Models\Round;
 use App\Models\Team;
 use App\Models\Tournament;
@@ -309,7 +312,7 @@ class CustomTournamentController extends Controller
         $tournament = Tournament::where('slug', $slug)->firstOrFail();
         $round = Round::where('id', $roundId)->where('tournament_id', $tournament->id)->firstOrFail();
 
-        $matches = $round->matches()->with('homeTeam', 'awayTeam')->orderBy('scheduled_at')->get()
+        $matches = $round->matches()->with(['homeTeam', 'awayTeam', 'result'])->orderBy('scheduled_at')->get()
             ->map(fn($m) => [
                 'id'           => $m->id,
                 'scheduled_at' => $m->scheduled_at->toIso8601String(),
@@ -317,9 +320,58 @@ class CustomTournamentController extends Controller
                 'status'       => $m->status,
                 'home_team'    => ['id' => $m->homeTeam->id, 'name' => $m->homeTeam->name, 'short_name' => $m->homeTeam->short_name],
                 'away_team'    => ['id' => $m->awayTeam->id, 'name' => $m->awayTeam->name, 'short_name' => $m->awayTeam->short_name],
+                'result'       => $m->result ? ['home_score' => $m->result->home_score, 'away_score' => $m->result->away_score, 'winner' => $m->result->winner] : null,
             ]);
 
         return response()->json(['data' => $matches]);
+    }
+
+    public function setMatchResult(Request $request, string $slug, int $roundId, int $matchId): JsonResponse
+    {
+        $tournament = Tournament::where('slug', $slug)->firstOrFail();
+        $this->authorizeCreator($request, $tournament);
+
+        $round = Round::where('id', $roundId)->where('tournament_id', $tournament->id)->firstOrFail();
+        $match = GameMatch::where('id', $matchId)->where('round_id', $round->id)->firstOrFail();
+
+        if ($match->scheduled_at->isFuture()) {
+            return response()->json(['message' => 'No puedes ingresar el resultado de un partido que aún no ha iniciado.'], 422);
+        }
+
+        $request->validate([
+            'home_score' => 'required|integer|min:0',
+            'away_score' => 'required|integer|min:0',
+        ]);
+
+        $existing = MatchResult::where('match_id', $matchId)->first();
+
+        if ($existing) {
+            $existing->update([
+                'home_score'   => $request->home_score,
+                'away_score'   => $request->away_score,
+                'confirmed_at' => now(),
+            ]);
+            RecalculateMatchScoresJob::dispatch($existing);
+            $result = $existing;
+        } else {
+            $result = MatchResult::create([
+                'match_id'     => $matchId,
+                'home_score'   => $request->home_score,
+                'away_score'   => $request->away_score,
+                'confirmed_at' => now(),
+            ]);
+            $match->update(['status' => 'finished']);
+            CalculateScoresJob::dispatch($result);
+        }
+
+        return response()->json([
+            'data'    => [
+                'home_score' => $result->home_score,
+                'away_score' => $result->away_score,
+                'winner'     => $result->winner,
+            ],
+            'message' => 'Resultado guardado. Los puntajes se están calculando.',
+        ]);
     }
 
     private function authorizeCreator(Request $request, Tournament $tournament): void

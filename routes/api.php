@@ -51,6 +51,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/tournaments/{slug}/rounds/{roundId}/matches', [CustomTournamentController::class, 'addMatch']);
     Route::patch('/tournaments/{slug}/rounds/{roundId}/matches/{matchId}', [CustomTournamentController::class, 'updateMatch']);
     Route::delete('/tournaments/{slug}/rounds/{roundId}/matches/{matchId}', [CustomTournamentController::class, 'removeMatch']);
+    Route::post('/tournaments/{slug}/rounds/{roundId}/matches/{matchId}/result', [CustomTournamentController::class, 'setMatchResult']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/me', [AuthController::class, 'me']);
 
@@ -72,6 +73,7 @@ Route::middleware('auth:sanctum')->group(function () {
 // Admin routes
 Route::middleware(['auth:sanctum', 'is_admin'])->prefix('admin')->group(function () {
     Route::post('/matches/{match}/results', [MatchResultController::class, 'store']);
+    Route::post('/tournaments/{slug}/sync-results', [MatchResultController::class, 'syncTournament']);
     Route::get('/tournaments', [TournamentAdminController::class, 'index']);
     Route::patch('/tournaments/{tournament}', [TournamentAdminController::class, 'update']);
 });
