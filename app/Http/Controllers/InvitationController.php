@@ -78,7 +78,7 @@ class InvitationController extends Controller
     {
         $invitation = Invitation::where('token', $token)
             ->where('expires_at', '>', now())
-            ->where('status', 'pending')
+            ->where('status', '!=', 'expired')
             ->with('quiniela')
             ->firstOrFail();
 
@@ -97,8 +97,6 @@ class InvitationController extends Controller
         Standing::firstOrCreate(
             ['quiniela_id' => $quiniela->id, 'user_id' => $user->id]
         );
-
-        $invitation->update(['status' => 'accepted']);
 
         return response()->json([
             'message' => '¡Te uniste a la quiniela exitosamente!',
