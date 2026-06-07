@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\GameMatch;
+use App\Models\Team;
 use App\Models\Tournament;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,19 +18,8 @@ class TournamentAdminController extends Controller
             ->orderByDesc('is_active')
             ->orderByDesc('starts_at')
             ->get()
-            ->map(fn ($t) => [
-                'id'         => $t->id,
-                'name'       => $t->name,
-                'slug'       => $t->slug,
-                'type'       => $t->type,
-                'season'     => $t->season,
-                'logo_url'   => $t->logo_url,
-                'starts_at'  => $t->starts_at?->toDateString(),
-                'ends_at'    => $t->ends_at?->toDateString(),
-                'is_active'  => $t->is_active,
-                'is_custom'  => $t->is_custom,
-                'creator'    => $t->creator ? ['id' => $t->creator->id, 'name' => $t->creator->name] : null,
-                'rounds_count'   => $t->rounds_count,
+            ->map(fn ($t) => $this->tournamentData($t) + [
+                'rounds_count'    => $t->rounds_count,
                 'quinielas_count' => $t->quinielas_count,
             ]);
 
@@ -38,31 +29,82 @@ class TournamentAdminController extends Controller
     public function update(Request $request, Tournament $tournament): JsonResponse
     {
         $validated = $request->validate([
-            'name'      => 'sometimes|string|max:255',
-            'is_active' => 'sometimes|boolean',
-            'starts_at' => 'sometimes|nullable|date',
-            'ends_at'   => 'sometimes|nullable|date',
+            'name'        => 'sometimes|string|max:255',
+            'is_active'   => 'sometimes|boolean',
+            'starts_at'   => 'sometimes|nullable|date',
+            'ends_at'     => 'sometimes|nullable|date',
+            'logo_url'    => 'sometimes|nullable|string|max:500',
+            'description' => 'sometimes|nullable|string|max:1000',
         ]);
 
-        $tournament->update($validated);
+        if (array_key_exists('description', $validated)) {
+            $meta                  = $tournament->meta ?? [];
+            $meta['description']   = $validated['description'];
+            $tournament->meta      = $meta;
+            unset($validated['description']);
+        }
+
+        $tournament->fill($validated)->save();
         $tournament->refresh();
+
+        return response()->json(['data' => $this->tournamentData($tournament)]);
+    }
+
+    public function updateTeam(Request $request, Team $team): JsonResponse
+    {
+        $validated = $request->validate([
+            'name'       => 'sometimes|string|max:255',
+            'short_name' => 'sometimes|string|max:10',
+            'logo_url'   => 'sometimes|nullable|string|max:500',
+        ]);
+
+        $team->update($validated);
 
         return response()->json([
             'data' => [
-                'id'        => $tournament->id,
-                'name'      => $tournament->name,
-                'slug'      => $tournament->slug,
-                'type'      => $tournament->type,
-                'season'    => $tournament->season,
-                'logo_url'  => $tournament->logo_url,
-                'starts_at' => $tournament->starts_at?->toDateString(),
-                'ends_at'   => $tournament->ends_at?->toDateString(),
-                'is_active' => $tournament->is_active,
-                'is_custom' => $tournament->is_custom,
-                'creator'   => $tournament->creator
-                    ? ['id' => $tournament->creator->id, 'name' => $tournament->creator->name]
-                    : null,
+                'id'         => $team->id,
+                'name'       => $team->name,
+                'short_name' => $team->short_name,
+                'logo_url'   => $team->logo_url,
             ],
         ]);
+    }
+
+    public function updateMatch(Request $request, GameMatch $match): JsonResponse
+    {
+        $validated = $request->validate([
+            'scheduled_at' => 'sometimes|date',
+            'venue'        => 'sometimes|nullable|string|max:255',
+        ]);
+
+        $match->update($validated);
+
+        return response()->json([
+            'data' => [
+                'id'           => $match->id,
+                'scheduled_at' => $match->scheduled_at?->toIso8601String(),
+                'venue'        => $match->venue,
+            ],
+        ]);
+    }
+
+    private function tournamentData(Tournament $t): array
+    {
+        return [
+            'id'          => $t->id,
+            'name'        => $t->name,
+            'slug'        => $t->slug,
+            'type'        => $t->type,
+            'season'      => $t->season,
+            'logo_url'    => $t->logo_url,
+            'description' => $t->meta['description'] ?? null,
+            'starts_at'   => $t->starts_at?->toDateString(),
+            'ends_at'     => $t->ends_at?->toDateString(),
+            'is_active'   => $t->is_active,
+            'is_custom'   => $t->is_custom,
+            'creator'     => $t->creator
+                ? ['id' => $t->creator->id, 'name' => $t->creator->name]
+                : null,
+        ];
     }
 }

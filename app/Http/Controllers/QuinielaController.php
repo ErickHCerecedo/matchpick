@@ -52,14 +52,30 @@ class QuinielaController extends Controller
             }
         }
 
-        // Count open matches the user has not yet predicted in each quiniela
+        // Count unpredicted open matches on the NEXT match day only
         $pendingCounts = [];
         foreach ($quinielas as $q) {
+            $nextMatch = GameMatch::whereHas(
+                'round',
+                fn ($r) => $r->where('tournament_id', $q->tournament_id)
+            )
+                ->where('prediction_closes_at', '>', now())
+                ->orderBy('scheduled_at')
+                ->first();
+
+            if (!$nextMatch) {
+                $pendingCounts[$q->id] = 0;
+                continue;
+            }
+
+            $nextDate = $nextMatch->scheduled_at->toDateString();
+
             $pendingCounts[$q->id] = GameMatch::whereHas(
                 'round',
                 fn ($r) => $r->where('tournament_id', $q->tournament_id)
             )
                 ->where('prediction_closes_at', '>', now())
+                ->whereDate('scheduled_at', $nextDate)
                 ->whereDoesntHave(
                     'predictions',
                     fn ($p) => $p->where('user_id', $userId)->where('quiniela_id', $q->id)

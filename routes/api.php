@@ -11,6 +11,7 @@ use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\MatchResultController;
 use App\Http\Controllers\QuinielaResultController;
 use App\Http\Controllers\Admin\TournamentAdminController;
+use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
 // Auth - public
@@ -55,6 +56,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/tournaments/{slug}/rounds/{roundId}/matches/{matchId}/result', [CustomTournamentController::class, 'setMatchResult']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/me', [AuthController::class, 'me']);
+    Route::post('/profile', [ProfileController::class, 'update']);
 
     Route::apiResource('quinielas', QuinielaController::class)->parameters(['quinielas' => 'slug']);
     Route::get('/quinielas/{slug}/standings', [StandingController::class, 'index']);
@@ -77,4 +79,6 @@ Route::middleware(['auth:sanctum', 'is_admin'])->prefix('admin')->group(function
     Route::post('/tournaments/{slug}/sync-results', [MatchResultController::class, 'syncTournament']);
     Route::get('/tournaments', [TournamentAdminController::class, 'index']);
     Route::patch('/tournaments/{tournament}', [TournamentAdminController::class, 'update']);
+    Route::patch('/teams/{team}', [TournamentAdminController::class, 'updateTeam']);
+    Route::patch('/matches/{match}', [TournamentAdminController::class, 'updateMatch']);
 });

@@ -29,7 +29,13 @@ return [
     ],
 
     'apifootball' => [
-        'key' => env('APIFOOTBALL_KEY', ''),
+        'key'      => env('APIFOOTBALL_KEY', ''),
         'base_url' => 'https://v3.football.api-sports.io',
+    ],
+
+    'cloudinary' => [
+        'cloud_name' => env('CLOUDINARY_CLOUD_NAME', 'dr0klvutj'),
+        'api_key'    => env('CLOUDINARY_API_KEY', '683293141245113'),
+        'api_secret' => env('CLOUDINARY_API_SECRET', 'hGpHxDIaLfo6Hv4QWk3yItpWS1o'),
     ],
 ];
