@@ -131,4 +131,126 @@ class TournamentController extends Controller
             ],
         ]);
     }
+
+    public function teamStandings(string $slug): JsonResponse
+    {
+        $tournament = Tournament::where('slug', $slug)
+            ->with([
+                'rounds.matches.homeTeam.country',
+                'rounds.matches.awayTeam.country',
+                'rounds.matches.result',
+            ])
+            ->firstOrFail();
+
+        $meta        = $tournament->meta ?? [];
+        $hasGroups   = $tournament->rounds->where('type', 'group')->isNotEmpty();
+        $format      = $hasGroups ? 'groups' : 'table';
+        $qualSpots   = $meta['qualification_spots'] ?? ($format === 'groups' ? 2 : 8);
+
+        if ($format === 'groups') {
+            $groups = $tournament->rounds
+                ->where('type', 'group')
+                ->map(fn ($round) => [
+                    'name'  => $round->name,
+                    'teams' => $this->buildTable($round->matches),
+                ])
+                ->values();
+
+            return response()->json([
+                'data' => [
+                    'format'              => 'groups',
+                    'qualification_spots' => $qualSpots,
+                    'groups'              => $groups,
+                ],
+            ]);
+        }
+
+        $allMatches = $tournament->rounds->flatMap(fn ($r) => $r->matches);
+
+        return response()->json([
+            'data' => [
+                'format'              => 'table',
+                'qualification_spots' => $qualSpots,
+                'teams'               => $this->buildTable($allMatches),
+            ],
+        ]);
+    }
+
+    private function buildTable($matches): array
+    {
+        $table = [];
+
+        foreach ($matches as $match) {
+            if (!$match->homeTeam || !$match->awayTeam) continue;
+
+            $homeId = $match->homeTeam->id;
+            $awayId = $match->awayTeam->id;
+
+            if (!isset($table[$homeId])) {
+                $table[$homeId] = $this->initTeamRow($match->homeTeam);
+            }
+            if (!isset($table[$awayId])) {
+                $table[$awayId] = $this->initTeamRow($match->awayTeam);
+            }
+
+            if (!$match->result) continue;
+
+            $hg = $match->result->home_score;
+            $ag = $match->result->away_score;
+
+            $table[$homeId]['played']++;
+            $table[$awayId]['played']++;
+            $table[$homeId]['goals_for']      += $hg;
+            $table[$homeId]['goals_against']  += $ag;
+            $table[$awayId]['goals_for']      += $ag;
+            $table[$awayId]['goals_against']  += $hg;
+
+            if ($hg > $ag) {
+                $table[$homeId]['won']++;
+                $table[$homeId]['points'] += 3;
+                $table[$awayId]['lost']++;
+            } elseif ($hg < $ag) {
+                $table[$awayId]['won']++;
+                $table[$awayId]['points'] += 3;
+                $table[$homeId]['lost']++;
+            } else {
+                $table[$homeId]['drawn']++;
+                $table[$homeId]['points']++;
+                $table[$awayId]['drawn']++;
+                $table[$awayId]['points']++;
+            }
+        }
+
+        foreach ($table as &$row) {
+            $row['goal_difference'] = $row['goals_for'] - $row['goals_against'];
+        }
+        unset($row);
+
+        usort($table, function ($a, $b) {
+            if ($b['points']          !== $a['points'])          return $b['points']          - $a['points'];
+            if ($b['goal_difference'] !== $a['goal_difference']) return $b['goal_difference'] - $a['goal_difference'];
+            if ($b['goals_for']       !== $a['goals_for'])       return $b['goals_for']       - $a['goals_for'];
+            return strcmp($a['name'], $b['name']);
+        });
+
+        return array_values($table);
+    }
+
+    private function initTeamRow($team): array
+    {
+        return [
+            'id'              => $team->id,
+            'name'            => $team->name,
+            'short_name'      => $team->short_name,
+            'logo_url'        => $team->logo_url ?? $team->country?->flag_url,
+            'played'          => 0,
+            'won'             => 0,
+            'drawn'           => 0,
+            'lost'            => 0,
+            'goals_for'       => 0,
+            'goals_against'   => 0,
+            'goal_difference' => 0,
+            'points'          => 0,
+        ];
+    }
 }

@@ -26,6 +26,7 @@ Route::get('/tournaments', [TournamentController::class, 'index']);
 Route::get('/tournaments/{slug}', [TournamentController::class, 'show']);
 Route::get('/tournaments/{slug}/matches', [TournamentController::class, 'matches']);
 Route::get('/tournaments/{slug}/global-standings', [TournamentController::class, 'globalStandings']);
+Route::get('/tournaments/{slug}/team-standings', [TournamentController::class, 'teamStandings']);
 Route::get('/tournaments/{slug}/public-quinielas', [TournamentController::class, 'publicQuinielas']);
 
 // Invitations - mixed
