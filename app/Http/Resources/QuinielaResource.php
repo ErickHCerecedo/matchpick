@@ -17,7 +17,7 @@ class QuinielaResource extends JsonResource
             'is_active' => $this->is_active,
             'predictions_open' => $this->predictions_open,
             'max_participants' => $this->max_participants,
-            'participants_count' => $this->whenLoaded('participants', fn() => $this->participants->count(), 0),
+            'participants_count' => $this->participants_count ?? $this->whenLoaded('participants', fn() => $this->participants->count(), 0),
             'my_role' => $this->when(
                 $this->relationLoaded('participants') && $request->user(),
                 fn() => $this->participants->where('id', $request->user()?->id)->first()?->pivot->role

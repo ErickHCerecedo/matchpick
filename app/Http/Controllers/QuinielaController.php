@@ -17,12 +17,64 @@ class QuinielaController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $quinielas = $request->user()->participatingQuinielas()
+        $user      = $request->user();
+        $quinielas = $user->participatingQuinielas()
             ->with(['tournament', 'creator'])
+            ->withCount('participants')
             ->active()
             ->get();
 
-        return response()->json(['data' => QuinielaResource::collection($quinielas)]);
+        if ($quinielas->isEmpty()) {
+            return response()->json(['data' => []]);
+        }
+
+        $quinielaIds = $quinielas->pluck('id');
+        $userId      = $user->id;
+
+        // Batch-load all standings so rank can be computed without N+1 queries
+        $standingsByQuiniela = Standing::whereIn('quiniela_id', $quinielaIds)
+            ->orderBy('quiniela_id')
+            ->orderByDesc('total_points')
+            ->orderByDesc('exact_scores')
+            ->get()
+            ->groupBy('quiniela_id');
+
+        $myStandings = [];
+        foreach ($standingsByQuiniela as $qId => $standings) {
+            foreach ($standings as $rank => $s) {
+                if ($s->user_id === $userId) {
+                    $myStandings[(int) $qId] = [
+                        'rank'         => $rank + 1,
+                        'total_points' => $s->total_points,
+                    ];
+                    break;
+                }
+            }
+        }
+
+        // Count open matches the user has not yet predicted in each quiniela
+        $pendingCounts = [];
+        foreach ($quinielas as $q) {
+            $pendingCounts[$q->id] = GameMatch::whereHas(
+                'round',
+                fn ($r) => $r->where('tournament_id', $q->tournament_id)
+            )
+                ->where('prediction_closes_at', '>', now())
+                ->whereDoesntHave(
+                    'predictions',
+                    fn ($p) => $p->where('user_id', $userId)->where('quiniela_id', $q->id)
+                )
+                ->count();
+        }
+
+        $data = $quinielas->map(function ($q) use ($myStandings, $pendingCounts) {
+            $resource                              = (new QuinielaResource($q))->resolve();
+            $resource['my_standing']               = $myStandings[$q->id] ?? null;
+            $resource['pending_predictions_count'] = $pendingCounts[$q->id] ?? 0;
+            return $resource;
+        });
+
+        return response()->json(['data' => $data]);
     }
 
     public function store(CreateQuinielaRequest $request): JsonResponse
