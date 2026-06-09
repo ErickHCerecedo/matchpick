@@ -11,6 +11,7 @@ use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\MatchResultController;
 use App\Http\Controllers\QuinielaResultController;
 use App\Http\Controllers\Admin\TournamentAdminController;
+use App\Http\Controllers\Admin\SiteSettingController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
@@ -21,6 +22,9 @@ Route::prefix('auth')->group(function () {
     Route::get('/google/redirect', [GoogleAuthController::class, 'redirect']);
     Route::get('/google/callback', [GoogleAuthController::class, 'callback']);
 });
+
+// Site settings - public read
+Route::get('/site-settings', [SiteSettingController::class, 'show']);
 
 // Tournaments - public
 Route::get('/tournaments', [TournamentController::class, 'index']);
@@ -81,4 +85,5 @@ Route::middleware(['auth:sanctum', 'is_admin'])->prefix('admin')->group(function
     Route::patch('/tournaments/{tournament}', [TournamentAdminController::class, 'update']);
     Route::patch('/teams/{team}', [TournamentAdminController::class, 'updateTeam']);
     Route::patch('/matches/{match}', [TournamentAdminController::class, 'updateMatch']);
+    Route::put('/site-settings', [SiteSettingController::class, 'update']);
 });
