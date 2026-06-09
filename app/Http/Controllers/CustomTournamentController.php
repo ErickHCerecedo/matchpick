@@ -53,6 +53,30 @@ class CustomTournamentController extends Controller
         ], 201);
     }
 
+    public function update(Request $request, string $slug): JsonResponse
+    {
+        $tournament = Tournament::where('slug', $slug)->firstOrFail();
+        $this->authorizeCreator($request, $tournament);
+
+        $data = $request->validate([
+            'name'     => 'sometimes|string|max:150',
+            'logo_url' => 'nullable|string|max:500',
+        ]);
+
+        if (isset($data['name']) && $data['name'] !== $tournament->name) {
+            $tournament->name = $data['name'];
+        }
+        if (array_key_exists('logo_url', $data)) {
+            $tournament->logo_url = $data['logo_url'];
+        }
+        $tournament->save();
+
+        return response()->json([
+            'data'    => new TournamentResource($tournament->load('creator')),
+            'message' => 'Torneo actualizado.',
+        ]);
+    }
+
     public function mine(Request $request): JsonResponse
     {
         $tournaments = Tournament::where('creator_id', $request->user()->id)

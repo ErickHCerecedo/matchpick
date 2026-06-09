@@ -48,6 +48,7 @@ Route::get('/tournaments/{slug}/rounds/{roundId}/matches', [CustomTournamentCont
 Route::middleware('auth:sanctum')->group(function () {
     // Custom tournament management
     Route::post('/tournaments', [CustomTournamentController::class, 'store']);
+    Route::patch('/tournaments/{slug}', [CustomTournamentController::class, 'update']);
     Route::get('/my-tournaments', [CustomTournamentController::class, 'mine']);
     Route::post('/tournaments/{slug}/teams', [CustomTournamentController::class, 'addTeam']);
     Route::patch('/tournaments/{slug}/teams/{teamId}', [CustomTournamentController::class, 'updateTeam']);
