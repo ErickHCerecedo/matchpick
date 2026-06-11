@@ -413,7 +413,9 @@ class CustomTournamentController extends Controller
                 'away_score'   => $request->away_score,
                 'confirmed_at' => now(),
             ]);
-            $match->update(['status' => 'finished']);
+            if ($match->status !== 'in_progress') {
+                $match->update(['status' => 'finished']);
+            }
             CalculateScoresJob::dispatch($result);
         }
 
