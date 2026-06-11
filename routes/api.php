@@ -61,6 +61,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/tournaments/{slug}/rounds/{roundId}/matches', [CustomTournamentController::class, 'addMatch']);
     Route::patch('/tournaments/{slug}/rounds/{roundId}/matches/{matchId}', [CustomTournamentController::class, 'updateMatch']);
     Route::delete('/tournaments/{slug}/rounds/{roundId}/matches/{matchId}', [CustomTournamentController::class, 'removeMatch']);
+    Route::patch('/tournaments/{slug}/rounds/{roundId}/matches/{matchId}/status', [CustomTournamentController::class, 'updateMatchStatus']);
     Route::post('/tournaments/{slug}/rounds/{roundId}/matches/{matchId}/result', [CustomTournamentController::class, 'setMatchResult']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/me', [AuthController::class, 'me']);

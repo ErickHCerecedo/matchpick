@@ -362,6 +362,23 @@ class CustomTournamentController extends Controller
         return response()->json(['data' => $matches]);
     }
 
+    public function updateMatchStatus(Request $request, string $slug, int $roundId, int $matchId): JsonResponse
+    {
+        $tournament = Tournament::where('slug', $slug)->firstOrFail();
+        $this->authorizeCreator($request, $tournament);
+
+        $round = Round::where('id', $roundId)->where('tournament_id', $tournament->id)->firstOrFail();
+        $match = GameMatch::where('id', $matchId)->where('round_id', $round->id)->firstOrFail();
+
+        $request->validate([
+            'status' => 'required|in:scheduled,in_progress,finished,cancelled',
+        ]);
+
+        $match->update(['status' => $request->status]);
+
+        return response()->json(['data' => $match, 'message' => 'Estado del partido actualizado.']);
+    }
+
     public function setMatchResult(Request $request, string $slug, int $roundId, int $matchId): JsonResponse
     {
         $tournament = Tournament::where('slug', $slug)->firstOrFail();
