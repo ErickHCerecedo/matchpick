@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Builder;
 class GameMatch extends Model
 {
     protected $table = 'matches';
-    protected $fillable = ['round_id', 'home_team_id', 'away_team_id', 'scheduled_at', 'venue', 'status', 'prediction_closes_at', 'external_id'];
+    protected $fillable = ['round_id', 'home_team_id', 'home_placeholder', 'away_team_id', 'away_placeholder', 'scheduled_at', 'venue', 'status', 'prediction_closes_at', 'external_id', 'bracket_slot'];
 
     protected function casts(): array
     {

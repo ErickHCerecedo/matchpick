@@ -15,6 +15,9 @@ class MatchResource extends JsonResource
             'venue' => $this->venue,
             'status' => $this->status,
             'is_prediction_open' => $this->isPredictionOpen(),
+            'bracket_slot' => $this->bracket_slot,
+            'home_placeholder' => $this->home_placeholder,
+            'away_placeholder' => $this->away_placeholder,
             'home_team' => $this->whenLoaded('homeTeam', fn() => [
                 'id' => $this->homeTeam->id,
                 'name' => $this->homeTeam->name,

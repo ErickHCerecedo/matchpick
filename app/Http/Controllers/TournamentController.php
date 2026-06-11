@@ -47,18 +47,21 @@ class TournamentController extends Controller
                         'venue'                => $match->venue,
                         'status'               => $match->status,
                         'is_prediction_open'   => $match->isPredictionOpen(),
+                        'bracket_slot'         => $match->bracket_slot,
                         'home_team'            => $match->homeTeam ? [
                             'id'         => $match->homeTeam->id,
                             'name'       => $match->homeTeam->name,
                             'short_name' => $match->homeTeam->short_name,
                             'flag_url'   => $match->homeTeam->country?->flag_url,
                         ] : null,
+                        'home_placeholder'     => $match->home_placeholder,
                         'away_team'            => $match->awayTeam ? [
                             'id'         => $match->awayTeam->id,
                             'name'       => $match->awayTeam->name,
                             'short_name' => $match->awayTeam->short_name,
                             'flag_url'   => $match->awayTeam->country?->flag_url,
                         ] : null,
+                        'away_placeholder'     => $match->away_placeholder,
                         'result'               => $match->result ? [
                             'home_score' => $match->result->home_score,
                             'away_score' => $match->result->away_score,
