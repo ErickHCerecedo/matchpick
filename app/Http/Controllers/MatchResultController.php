@@ -37,11 +37,25 @@ class MatchResultController extends Controller
                 'away_score'   => $request->away_score,
                 'confirmed_at' => now(),
             ]);
-            $match->update(['status' => 'finished']);
+            // Only mark finished if the match wasn't already set to in_progress by admin
+            if ($match->status !== 'in_progress') {
+                $match->update(['status' => 'finished']);
+            }
             CalculateScoresJob::dispatch($result);
         }
 
         return response()->json(['data' => $result, 'message' => 'Resultado guardado. Los puntajes se están calculando.']);
+    }
+
+    public function updateStatus(Request $request, GameMatch $match): JsonResponse
+    {
+        $request->validate([
+            'status' => 'required|in:scheduled,in_progress,finished,cancelled',
+        ]);
+
+        $match->update(['status' => $request->status]);
+
+        return response()->json(['data' => $match, 'message' => 'Estado del partido actualizado.']);
     }
 
     public function syncTournament(Request $request, string $slug, ApiFootballService $api): JsonResponse
