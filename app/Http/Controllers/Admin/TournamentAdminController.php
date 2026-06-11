@@ -75,15 +75,32 @@ class TournamentAdminController extends Controller
         $validated = $request->validate([
             'scheduled_at' => 'sometimes|date',
             'venue'        => 'sometimes|nullable|string|max:255',
+            'home_team_id' => 'sometimes|nullable|exists:teams,id',
+            'away_team_id' => 'sometimes|nullable|exists:teams,id',
         ]);
 
         $match->update($validated);
+        $match->load('homeTeam.country', 'awayTeam.country');
 
         return response()->json([
             'data' => [
-                'id'           => $match->id,
-                'scheduled_at' => $match->scheduled_at?->toIso8601String(),
-                'venue'        => $match->venue,
+                'id'               => $match->id,
+                'scheduled_at'     => $match->scheduled_at?->toIso8601String(),
+                'venue'            => $match->venue,
+                'home_team'        => $match->homeTeam ? [
+                    'id'         => $match->homeTeam->id,
+                    'name'       => $match->homeTeam->name,
+                    'short_name' => $match->homeTeam->short_name,
+                    'logo_url'   => $match->homeTeam->logo_url ?? $match->homeTeam->country?->flag_url,
+                ] : null,
+                'home_placeholder' => $match->home_placeholder,
+                'away_team'        => $match->awayTeam ? [
+                    'id'         => $match->awayTeam->id,
+                    'name'       => $match->awayTeam->name,
+                    'short_name' => $match->awayTeam->short_name,
+                    'logo_url'   => $match->awayTeam->logo_url ?? $match->awayTeam->country?->flag_url,
+                ] : null,
+                'away_placeholder' => $match->away_placeholder,
             ],
         ]);
     }
