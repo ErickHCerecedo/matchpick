@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Resources\TournamentResource;
+use App\Models\GameMatch;
 use App\Models\Tournament;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -73,6 +74,48 @@ class TournamentController extends Controller
         });
 
         return response()->json(['data' => $data]);
+    }
+
+    public function liveMatches(): JsonResponse
+    {
+        $matches = GameMatch::where('status', 'in_progress')
+            ->with(['homeTeam.country', 'awayTeam.country', 'result', 'round.tournament'])
+            ->get()
+            ->map(fn ($match) => [
+                'id'               => $match->id,
+                'scheduled_at'     => $match->scheduled_at?->toIso8601String(),
+                'venue'            => $match->venue,
+                'status'           => $match->status,
+                'tournament'       => [
+                    'id'       => $match->round->tournament->id,
+                    'name'     => $match->round->tournament->name,
+                    'slug'     => $match->round->tournament->slug,
+                    'logo_url' => $match->round->tournament->logo_url,
+                ],
+                'round'            => [
+                    'id'   => $match->round->id,
+                    'name' => $match->round->name,
+                ],
+                'home_team'        => $match->homeTeam ? [
+                    'id'         => $match->homeTeam->id,
+                    'name'       => $match->homeTeam->name,
+                    'short_name' => $match->homeTeam->short_name,
+                    'flag_url'   => $match->homeTeam->country?->flag_url,
+                ] : null,
+                'home_placeholder' => $match->home_placeholder,
+                'away_team'        => $match->awayTeam ? [
+                    'id'         => $match->awayTeam->id,
+                    'name'       => $match->awayTeam->name,
+                    'short_name' => $match->awayTeam->short_name,
+                    'flag_url'   => $match->awayTeam->country?->flag_url,
+                ] : null,
+                'away_placeholder' => $match->away_placeholder,
+                'result'           => $match->result
+                    ? ['home_score' => $match->result->home_score, 'away_score' => $match->result->away_score]
+                    : null,
+            ]);
+
+        return response()->json(['data' => $matches]);
     }
 
     public function globalStandings(string $slug): JsonResponse

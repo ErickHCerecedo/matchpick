@@ -26,6 +26,9 @@ Route::prefix('auth')->group(function () {
 // Site settings - public read
 Route::get('/site-settings', [SiteSettingController::class, 'show']);
 
+// Matches - public
+Route::get('/matches/live', [TournamentController::class, 'liveMatches']);
+
 // Tournaments - public
 Route::get('/tournaments', [TournamentController::class, 'index']);
 Route::get('/tournaments/{slug}', [TournamentController::class, 'show']);

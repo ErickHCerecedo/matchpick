@@ -336,15 +336,25 @@ class CustomTournamentController extends Controller
         $tournament = Tournament::where('slug', $slug)->firstOrFail();
         $round = Round::where('id', $roundId)->where('tournament_id', $tournament->id)->firstOrFail();
 
-        $matches = $round->matches()->with(['homeTeam', 'awayTeam', 'result'])->orderBy('scheduled_at')->get()
+        $matches = $round->matches()->with(['homeTeam.country', 'awayTeam.country', 'result'])->orderBy('scheduled_at')->get()
             ->map(fn($m) => [
                 'id'               => $m->id,
                 'scheduled_at'     => $m->scheduled_at->toIso8601String(),
                 'venue'            => $m->venue,
                 'status'           => $m->status,
-                'home_team'        => $m->homeTeam ? ['id' => $m->homeTeam->id, 'name' => $m->homeTeam->name, 'short_name' => $m->homeTeam->short_name] : null,
+                'home_team'        => $m->homeTeam ? [
+                    'id'         => $m->homeTeam->id,
+                    'name'       => $m->homeTeam->name,
+                    'short_name' => $m->homeTeam->short_name,
+                    'logo_url'   => $m->homeTeam->logo_url ?? $m->homeTeam->country?->flag_url,
+                ] : null,
                 'home_placeholder' => $m->home_placeholder,
-                'away_team'        => $m->awayTeam ? ['id' => $m->awayTeam->id, 'name' => $m->awayTeam->name, 'short_name' => $m->awayTeam->short_name] : null,
+                'away_team'        => $m->awayTeam ? [
+                    'id'         => $m->awayTeam->id,
+                    'name'       => $m->awayTeam->name,
+                    'short_name' => $m->awayTeam->short_name,
+                    'logo_url'   => $m->awayTeam->logo_url ?? $m->awayTeam->country?->flag_url,
+                ] : null,
                 'away_placeholder' => $m->away_placeholder,
                 'result'           => $m->result ? ['home_score' => $m->result->home_score, 'away_score' => $m->result->away_score, 'winner' => $m->result->winner] : null,
             ]);
