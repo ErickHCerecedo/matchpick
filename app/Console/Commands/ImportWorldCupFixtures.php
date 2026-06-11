@@ -79,8 +79,7 @@ class ImportWorldCupFixtures extends Command
 
             $status = $api->mapStatus($fixture['fixture']['status']['short']);
 
-            // Predictions close 1 hour before kick-off
-            $predictionClosesAt = (new \Carbon\Carbon($scheduledAt))->subHour();
+            $predictionClosesAt = $scheduledAt;
 
             $match = GameMatch::updateOrCreate(
                 ['external_id' => $externalId],
