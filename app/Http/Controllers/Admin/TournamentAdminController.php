@@ -79,6 +79,10 @@ class TournamentAdminController extends Controller
             'away_team_id' => 'sometimes|nullable|exists:teams,id',
         ]);
 
+        if (isset($validated['scheduled_at'])) {
+            $validated['prediction_closes_at'] = $validated['scheduled_at'];
+        }
+
         $match->update($validated);
         $match->load('homeTeam.country', 'awayTeam.country');
 
