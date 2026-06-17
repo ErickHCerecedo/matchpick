@@ -10,6 +10,8 @@ use App\Services\FootballDataService;
 use App\Services\XlsxWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
+use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\HttpFoundation\Response;
 
 class MatchResultController extends Controller
@@ -103,6 +105,54 @@ class MatchResultController extends Controller
             'Content-Type'        => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'Content-Disposition' => 'attachment; filename="' . $filename . '"',
             'Content-Length'      => strlen($binary),
+        ]);
+    }
+
+    public function runSync(): JsonResponse
+    {
+        $started = microtime(true);
+
+        try {
+            $output   = new BufferedOutput();
+            $exitCode = Artisan::call('matches:wc-auto-sync', [], $output);
+            $raw      = $output->fetch();
+        } catch (\Throwable $e) {
+            return response()->json([
+                'data' => [
+                    'ok'       => false,
+                    'exit_code' => 1,
+                    'lines'    => [['text' => 'Error al ejecutar el comando: ' . $e->getMessage(), 'level' => 'error']],
+                    'ran_at'   => now()->toISOString(),
+                    'duration' => round((microtime(true) - $started) * 1000),
+                ],
+            ]);
+        }
+
+        // Strip ANSI colour codes emitted by the console
+        $clean = preg_replace('/\033\[[0-9;]*m/', '', $raw);
+        $lines = array_values(array_filter(
+            explode("\n", $clean),
+            fn ($l) => trim($l) !== ''
+        ));
+
+        $parsed = array_map(function ($text) {
+            $level = 'info';
+            $t = strtolower($text);
+            if (str_contains($t, 'error') || str_contains($t, 'fail'))  $level = 'error';
+            elseif (str_contains($t, 'warn') || str_contains($t, 'not found')) $level = 'warn';
+            elseif (str_contains($t, 'done') || str_contains($t, 'finished') || str_contains($t, 'started')) $level = 'success';
+            elseif (str_starts_with(ltrim($text), '[#'))                $level = 'detail';
+            return ['text' => $text, 'level' => $level];
+        }, $lines);
+
+        return response()->json([
+            'data' => [
+                'ok'       => $exitCode === 0,
+                'exit_code' => $exitCode,
+                'lines'    => $parsed,
+                'ran_at'   => now()->toISOString(),
+                'duration' => round((microtime(true) - $started) * 1000),
+            ],
         ]);
     }
 
