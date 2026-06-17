@@ -53,19 +53,21 @@ class TournamentAdminController extends Controller
     public function updateTeam(Request $request, Team $team): JsonResponse
     {
         $validated = $request->validate([
-            'name'       => 'sometimes|string|max:255',
-            'short_name' => 'sometimes|string|max:10',
-            'logo_url'   => 'sometimes|nullable|string|max:500',
+            'name'        => 'sometimes|string|max:255',
+            'short_name'  => 'sometimes|string|max:10',
+            'logo_url'    => 'sometimes|nullable|string|max:500',
+            'external_id' => 'sometimes|nullable|string|max:100',
         ]);
 
         $team->update($validated);
 
         return response()->json([
             'data' => [
-                'id'         => $team->id,
-                'name'       => $team->name,
-                'short_name' => $team->short_name,
-                'logo_url'   => $team->logo_url,
+                'id'          => $team->id,
+                'name'        => $team->name,
+                'short_name'  => $team->short_name,
+                'logo_url'    => $team->logo_url,
+                'external_id' => $team->external_id,
             ],
         ]);
     }
@@ -77,6 +79,7 @@ class TournamentAdminController extends Controller
             'venue'        => 'sometimes|nullable|string|max:255',
             'home_team_id' => 'sometimes|nullable|exists:teams,id',
             'away_team_id' => 'sometimes|nullable|exists:teams,id',
+            'external_id'  => 'sometimes|nullable|string|max:100',
         ]);
 
         if (isset($validated['scheduled_at'])) {
@@ -91,6 +94,7 @@ class TournamentAdminController extends Controller
                 'id'               => $match->id,
                 'scheduled_at'     => $match->scheduled_at?->toIso8601String(),
                 'venue'            => $match->venue,
+                'external_id'      => $match->external_id,
                 'home_team'        => $match->homeTeam ? [
                     'id'         => $match->homeTeam->id,
                     'name'       => $match->homeTeam->name,

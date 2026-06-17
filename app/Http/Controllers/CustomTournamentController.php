@@ -98,10 +98,11 @@ class CustomTournamentController extends Controller
                 ->orderBy('name')
                 ->get()
                 ->map(fn($t) => [
-                    'id'         => $t->id,
-                    'name'       => $t->name,
-                    'short_name' => $t->short_name,
-                    'logo_url'   => $t->logo_url,
+                    'id'          => $t->id,
+                    'name'        => $t->name,
+                    'short_name'  => $t->short_name,
+                    'logo_url'    => $t->logo_url,
+                    'external_id' => $t->external_id,
                 ]);
         } else {
             // National teams are not linked via tournament_id — resolve them
@@ -122,11 +123,12 @@ class CustomTournamentController extends Controller
                 ->orderBy('name')
                 ->get()
                 ->map(fn($t) => [
-                    'id'         => $t->id,
-                    'name'       => $t->name,
-                    'short_name' => $t->short_name,
+                    'id'          => $t->id,
+                    'name'        => $t->name,
+                    'short_name'  => $t->short_name,
                     // National teams store the flag on their country, not on team.logo_url
-                    'logo_url'   => $t->logo_url ?? $t->country?->flag_url,
+                    'logo_url'    => $t->logo_url ?? $t->country?->flag_url,
+                    'external_id' => $t->external_id,
                 ]);
         }
 
@@ -342,6 +344,7 @@ class CustomTournamentController extends Controller
                 'scheduled_at'     => $m->scheduled_at->toIso8601String(),
                 'venue'            => $m->venue,
                 'status'           => $m->status,
+                'external_id'      => $m->external_id,
                 'home_team'        => $m->homeTeam ? [
                     'id'         => $m->homeTeam->id,
                     'name'       => $m->homeTeam->name,

@@ -7,8 +7,10 @@ use App\Jobs\RecalculateMatchScoresJob;
 use App\Models\GameMatch;
 use App\Models\MatchResult;
 use App\Services\FootballDataService;
+use App\Services\XlsxWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 class MatchResultController extends Controller
 {
@@ -55,6 +57,53 @@ class MatchResultController extends Controller
         $match->update(['status' => $request->status]);
 
         return response()->json(['data' => $match, 'message' => 'Estado del partido actualizado.']);
+    }
+
+    public function exportWorldCupData(FootballDataService $api): Response
+    {
+        $raw     = $api->getWorldCupMatches();
+        $matches = $raw['matches'] ?? [];
+
+        // Collect unique teams keyed by API id
+        $teams = [];
+        foreach ($matches as $m) {
+            foreach (['homeTeam', 'awayTeam'] as $side) {
+                $t  = $m[$side] ?? [];
+                $id = $t['id'] ?? null;
+                if ($id && !isset($teams[$id])) {
+                    $teams[$id] = [$id, $t['name'] ?? '', $t['shortName'] ?? '', $t['tla'] ?? '', $t['crest'] ?? ''];
+                }
+            }
+        }
+        usort($teams, fn($a, $b) => strcmp($a[3], $b[3])); // sort by tla
+
+        $matchRows = array_map(fn($m) => [
+            $m['id'],
+            substr($m['utcDate'] ?? '', 0, 10),
+            substr($m['utcDate'] ?? '', 11, 5) . ' UTC',
+            $m['status']                        ?? '',
+            $m['stage']                         ?? '',
+            $m['matchday']                      ?? '',
+            $m['homeTeam']['tla']               ?? '',
+            $m['homeTeam']['name']              ?? '',
+            $m['awayTeam']['tla']               ?? '',
+            $m['awayTeam']['name']              ?? '',
+            $m['score']['fullTime']['home']      ?? '',
+            $m['score']['fullTime']['away']      ?? '',
+        ], $matches);
+
+        $xlsx = new XlsxWriter();
+        $xlsx->addSheet('Equipos',  ['api_id', 'name', 'short_name', 'tla', 'crest'], array_values($teams));
+        $xlsx->addSheet('Partidos', ['api_id', 'date', 'time_utc', 'status', 'stage', 'matchday', 'home_tla', 'home_name', 'away_tla', 'away_name', 'score_home', 'score_away'], $matchRows);
+
+        $filename = 'mundial-2026-' . date('Y-m-d') . '.xlsx';
+        $binary   = $xlsx->toBinary();
+
+        return response($binary, 200, [
+            'Content-Type'        => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Length'      => strlen($binary),
+        ]);
     }
 
     public function testFootballData(FootballDataService $api): JsonResponse
