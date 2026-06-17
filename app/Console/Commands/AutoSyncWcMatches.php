@@ -64,7 +64,7 @@ class AutoSyncWcMatches extends Command
             $apiMatch = $liveById->get((int) $extId);
 
             if ($apiMatch) {
-                $this->applyLive($match, $apiMatch);
+                $this->applyLive($match, $apiMatch, $api);
             } else {
                 // Not currently live — might have just finished or not started yet
                 $notLive[] = $match;
@@ -117,7 +117,7 @@ class AutoSyncWcMatches extends Command
             ->get();
     }
 
-    private function applyLive(GameMatch $match, array $apiMatch): void
+    private function applyLive(GameMatch $match, array $apiMatch, FootballDataService $api): void
     {
         // Transition to in_progress if needed
         if ($match->status !== 'in_progress') {
@@ -130,7 +130,7 @@ class AutoSyncWcMatches extends Command
         }
 
         // Update live score (no job dispatch; confirmed_at stays null)
-        $score = (new \App\Services\FootballDataService())->liveScore($apiMatch);
+        $score = $api->liveScore($apiMatch);
         MatchResult::updateOrCreate(
             ['match_id' => $match->id],
             ['home_score' => $score['home'], 'away_score' => $score['away'], 'confirmed_at' => null]
