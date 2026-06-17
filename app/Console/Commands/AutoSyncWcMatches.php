@@ -117,7 +117,8 @@ class AutoSyncWcMatches extends Command
             ['home_score'  => $score['home'], 'away_score' => $score['away'], 'confirmed_at' => null]
         );
 
-        $this->line("  [#{$match->external_id}] score {$score['home']}–{$score['away']} (live)");
+        $min = $score['minute'] !== null ? " min {$score['minute']}'" : '';
+        $this->line("  [#{$match->external_id}] score {$score['home']}–{$score['away']}{$min} (live)");
     }
 
     private function applyFinished(GameMatch $match, array $apiMatch): void

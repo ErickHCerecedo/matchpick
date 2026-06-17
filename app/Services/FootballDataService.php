@@ -60,8 +60,9 @@ class FootballDataService
         $ht = $match['score']['halfTime']  ?? [];
 
         return [
-            'home' => (int) ($ft['home'] ?? $ht['home'] ?? 0),
-            'away' => (int) ($ft['away'] ?? $ht['away'] ?? 0),
+            'home'   => (int) ($ft['home'] ?? $ht['home'] ?? 0),
+            'away'   => (int) ($ft['away'] ?? $ht['away'] ?? 0),
+            'minute' => $match['minute'] ?? null,
         ];
     }
 
