@@ -68,8 +68,16 @@ class AutoSyncWcMatches extends Command
 
             $apiStatus = $apiMatch['status'] ?? 'UNKNOWN';
             $mapped    = $api->mapStatus($apiStatus);
+            $minute    = $apiMatch['minute'] ?? null;
+            $injTime   = $apiMatch['injuryTime'] ?? null;
 
-            $this->line("  [#{$match->external_id}] API status: {$apiStatus}");
+            $minLabel = match(true) {
+                $minute !== null && $injTime  => "min {$minute}+{$injTime}'",
+                $minute !== null              => "min {$minute}'",
+                default                       => 'min ?',
+            };
+
+            $this->line("  [#{$match->external_id}] API status: {$apiStatus} · {$minLabel}");
 
             match ($mapped) {
                 'in_progress' => $this->applyLive($match, $apiMatch, $api),
@@ -117,8 +125,7 @@ class AutoSyncWcMatches extends Command
             ['home_score'  => $score['home'], 'away_score' => $score['away'], 'confirmed_at' => null]
         );
 
-        $min = $score['minute'] !== null ? " min {$score['minute']}'" : '';
-        $this->line("  [#{$match->external_id}] score {$score['home']}–{$score['away']}{$min} (live)");
+        $this->line("  [#{$match->external_id}] marcador {$score['home']}–{$score['away']} (live)");
     }
 
     private function applyFinished(GameMatch $match, array $apiMatch): void
