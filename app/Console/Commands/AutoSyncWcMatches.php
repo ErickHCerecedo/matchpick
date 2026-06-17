@@ -36,7 +36,10 @@ class AutoSyncWcMatches extends Command
 
     public function handle(FootballDataService $api): int
     {
+        $now       = now();
         $watchlist = $this->buildWatchlist();
+
+        $this->line("[AutoSync] Server time: {$now->toIso8601String()} (UTC)");
 
         if ($watchlist->isEmpty()) {
             $this->line('[AutoSync] Nothing to watch.');
@@ -66,10 +69,13 @@ class AutoSyncWcMatches extends Command
                 continue;
             }
 
-            $apiStatus = $apiMatch['status'] ?? 'UNKNOWN';
-            $mapped    = $api->mapStatus($apiStatus);
+            $apiStatus  = $apiMatch['status'] ?? 'UNKNOWN';
+            $mapped     = $api->mapStatus($apiStatus);
+            $kickoff    = $match->scheduled_at
+                ? \Carbon\Carbon::parse($match->scheduled_at)->toIso8601String()
+                : '?';
 
-            $this->line("  [#{$match->external_id}] API status: {$apiStatus}");
+            $this->line("  [#{$match->external_id}] kickoff: {$kickoff} · API status: {$apiStatus}");
 
             match ($mapped) {
                 'in_progress' => $this->applyLive($match, $apiMatch, $api),
