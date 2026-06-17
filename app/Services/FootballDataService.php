@@ -29,6 +29,43 @@ class FootballDataService
     }
 
     /**
+     * Fetch a single match by its football-data.org ID.
+     */
+    public function getMatchById(string|int $id): array
+    {
+        return $this->request('/matches/' . $id);
+    }
+
+    /**
+     * Map a football-data.org status to our internal status.
+     * Returns null when no transition is needed (e.g. still SCHEDULED).
+     */
+    public function mapStatus(string $apiStatus): ?string
+    {
+        return match ($apiStatus) {
+            'IN_PLAY', 'PAUSED', 'HALFTIME'           => 'in_progress',
+            'FINISHED'                                  => 'finished',
+            'POSTPONED', 'CANCELLED', 'SUSPENDED'      => 'cancelled',
+            default                                     => null,
+        };
+    }
+
+    /**
+     * Extract the best available live score from a match object.
+     * During play fullTime is null; halfTime holds the last known score.
+     */
+    public function liveScore(array $match): array
+    {
+        $ft = $match['score']['fullTime']  ?? [];
+        $ht = $match['score']['halfTime']  ?? [];
+
+        return [
+            'home' => (int) ($ft['home'] ?? $ht['home'] ?? 0),
+            'away' => (int) ($ft['away'] ?? $ht['away'] ?? 0),
+        ];
+    }
+
+    /**
      * Fetch currently live matches across all competitions.
      */
     public function getLiveMatches(): array
