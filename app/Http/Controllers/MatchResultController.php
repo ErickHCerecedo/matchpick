@@ -106,6 +106,68 @@ class MatchResultController extends Controller
         ]);
     }
 
+    public function apiMatchStatus(FootballDataService $api): JsonResponse
+    {
+        try {
+            $dbMatches = GameMatch::whereNotNull('external_id')
+                ->with(['homeTeam', 'awayTeam', 'result'])
+                ->orderBy('scheduled_at')
+                ->get()
+                ->map(fn ($m) => [
+                    'id'           => $m->id,
+                    'external_id'  => $m->external_id,
+                    'scheduled_at' => $m->scheduled_at,
+                    'db_status'    => $m->status,
+                    'home_team'    => $m->homeTeam?->name ?? 'TBD',
+                    'away_team'    => $m->awayTeam?->name ?? 'TBD',
+                    'db_score'     => $m->result ? [
+                        'home'      => $m->result->home_score,
+                        'away'      => $m->result->away_score,
+                        'confirmed' => !is_null($m->result->confirmed_at),
+                    ] : null,
+                ]);
+
+            if ($dbMatches->isEmpty()) {
+                return response()->json([
+                    'data'    => ['ok' => true, 'connected' => false, 'matches' => []],
+                    'message' => 'No hay partidos con external_id asignado. Asigna external_id desde el panel de administración.',
+                ]);
+            }
+
+            $raw     = $api->getWorldCupMatches();
+            $allById = collect($raw['matches'] ?? [])->keyBy('id');
+
+            $merged = $dbMatches->map(function ($m) use ($allById, $api) {
+                $apiMatch  = $allById->get((int) $m['external_id']);
+                $apiStatus = $apiMatch ? ($apiMatch['status'] ?? 'UNKNOWN') : null;
+
+                return array_merge($m, [
+                    'api_found'  => $apiMatch !== null,
+                    'api_status' => $apiStatus,
+                    'api_mapped' => $apiMatch ? $api->mapStatus($apiStatus) : null,
+                    'api_score'  => $apiMatch ? $api->liveScore($apiMatch) : null,
+                ]);
+            });
+
+            return response()->json([
+                'data' => [
+                    'ok'          => true,
+                    'connected'   => true,
+                    'competition' => $raw['competition']['name'] ?? null,
+                    'rate_limit'  => $raw['_rate_limit'] ?? null,
+                    'total_api'   => $raw['resultSet']['count'] ?? 0,
+                    'matches'     => $merged->values()->all(),
+                ],
+                'message' => 'Conexión exitosa a football-data.org',
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'data'    => ['ok' => false, 'connected' => false, 'matches' => []],
+                'message' => 'Error: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
     public function testFootballData(FootballDataService $api): JsonResponse
     {
         try {
