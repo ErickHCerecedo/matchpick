@@ -76,6 +76,7 @@ class AutoSyncWcMatches extends Command
                 : '?';
 
             $this->line("  [#{$match->external_id}] kickoff: {$kickoff} · API status: {$apiStatus}");
+            $this->line("  [#{$match->external_id}] raw: " . json_encode($apiMatch, JSON_UNESCAPED_UNICODE));
 
             match ($mapped) {
                 'in_progress' => $this->applyLive($match, $apiMatch, $api),
