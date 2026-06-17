@@ -13,16 +13,16 @@ use Illuminate\Support\Facades\Log;
 /**
  * Runs every minute via the Laravel scheduler.
  *
- * For each WC match that has an external_id and is either:
- *   - scheduled  with scheduled_at <= now  (should have started)
- *   - in_progress                           (needs live score / finish detection)
- *
- * This command:
- *   1. Calls football-data.org once to get all currently live WC matches.
- *   2. For in_progress matches that are no longer live → fetches them
- *      individually to confirm they finished (1 extra call each).
- *   3. Transitions statuses and saves scores — dispatching scoring jobs
- *      ONLY when a match truly finishes (confirmed_at set).
+ * Strategy (simple & reliable):
+ *   1. Build a watchlist: matches with external_id that are scheduled (past
+ *      kick-off) or in_progress.
+ *   2. If the watchlist is empty → exit immediately (0 API calls).
+ *   3. Fetch ALL WC matches from football-data.org in ONE call (no status
+ *      filter — avoids API quirks with comma-separated values).
+ *   4. For each watched match, apply the API status directly:
+ *        in_progress → update status + live score (no scoring jobs)
+ *        finished    → save confirmed result + dispatch scoring job
+ *        cancelled   → mark cancelled
  *
  * Usage:
  *   php artisan matches:wc-auto-sync
@@ -32,7 +32,6 @@ class AutoSyncWcMatches extends Command
     protected $signature   = 'matches:wc-auto-sync';
     protected $description = 'Auto-start, live-score and auto-finish WC matches via football-data.org';
 
-    // Keep polling for this many minutes after scheduled_at (covers extra time + penalties)
     private const POLL_WINDOW_MINUTES = 130;
 
     public function handle(FootballDataService $api): int
@@ -40,66 +39,49 @@ class AutoSyncWcMatches extends Command
         $watchlist = $this->buildWatchlist();
 
         if ($watchlist->isEmpty()) {
-            $this->line('No matches to watch right now.');
+            $this->line('[AutoSync] Nothing to watch.');
             return self::SUCCESS;
         }
 
-        $this->info("Watching {$watchlist->count()} match(es)...");
+        $this->info("[AutoSync] Watching {$watchlist->count()} match(es)...");
 
-        // ── Step 1: one API call to get all live WC matches ──────────────
         try {
-            $raw        = $api->getWorldCupMatches('IN_PLAY,PAUSED,HALFTIME');
-            $liveById   = collect($raw['matches'] ?? [])->keyBy('id');
+            $raw     = $api->getWorldCupMatches(); // all 104 matches, no status filter
+            $allById = collect($raw['matches'] ?? [])->keyBy('id');
         } catch (\Throwable $e) {
-            Log::error('[AutoSync] Failed to fetch live WC matches', ['error' => $e->getMessage()]);
-            $this->error('API error: ' . $e->getMessage());
+            Log::error('[AutoSync] Failed to fetch WC matches', ['error' => $e->getMessage()]);
+            $this->error('[AutoSync] API error: ' . $e->getMessage());
             return self::FAILURE;
         }
 
-        // ── Step 2: process each watched match ───────────────────────────
-        $notLive = [];
-
         foreach ($watchlist as $match) {
-            $extId    = (string) $match->external_id;
-            $apiMatch = $liveById->get((int) $extId);
+            $apiMatch = $allById->get((int) $match->external_id);
 
-            if ($apiMatch) {
-                $this->applyLive($match, $apiMatch, $api);
-            } else {
-                // Not currently live — might have just finished or not started yet
-                $notLive[] = $match;
-            }
-        }
-
-        // ── Step 3: individual check for matches that left the live list ──
-        // Only worth checking if they were already in_progress (or well past kick-off)
-        foreach ($notLive as $match) {
-            $gracePastKickoff = now()->subMinutes(15);
-            $shouldHaveStarted = $match->scheduled_at->lte($gracePastKickoff);
-
-            if ($match->status !== 'in_progress' && !$shouldHaveStarted) {
-                // Still early — API may not have updated yet; wait
+            if (!$apiMatch) {
+                Log::warning('[AutoSync] external_id not found in API', [
+                    'match_id'    => $match->id,
+                    'external_id' => $match->external_id,
+                ]);
+                $this->warn("  [#{$match->external_id}] not found in API response");
                 continue;
             }
 
-            try {
-                $raw      = $api->getMatchById($match->external_id);
-                $apiMatch = $raw['match'] ?? $raw; // endpoint returns the match directly
-                $this->applyFinishedOrOther($match, $apiMatch, $api);
-            } catch (\Throwable $e) {
-                Log::warning('[AutoSync] Individual fetch failed', [
-                    'match_id'    => $match->id,
-                    'external_id' => $match->external_id,
-                    'error'       => $e->getMessage(),
-                ]);
-            }
+            $apiStatus = $apiMatch['status'] ?? 'UNKNOWN';
+            $mapped    = $api->mapStatus($apiStatus);
+
+            $this->line("  [#{$match->external_id}] API status: {$apiStatus}");
+
+            match ($mapped) {
+                'in_progress' => $this->applyLive($match, $apiMatch, $api),
+                'finished'    => $this->applyFinished($match, $apiMatch),
+                'cancelled'   => $this->applyCancelled($match),
+                default       => null, // SCHEDULED / TIMED / POSTPONED — no action yet
+            };
         }
 
-        $this->info('Done.');
+        $this->info('[AutoSync] Done.');
         return self::SUCCESS;
     }
-
-    // ── Helpers ────────────────────────────────────────────────────────────
 
     private function buildWatchlist(): \Illuminate\Database\Eloquent\Collection
     {
@@ -119,67 +101,71 @@ class AutoSyncWcMatches extends Command
 
     private function applyLive(GameMatch $match, array $apiMatch, FootballDataService $api): void
     {
-        // Transition to in_progress if needed
         if ($match->status !== 'in_progress') {
             $match->update(['status' => 'in_progress']);
             Log::info('[AutoSync] Match started', [
                 'match_id'    => $match->id,
                 'external_id' => $match->external_id,
             ]);
-            $this->line("  [#{$match->external_id}] started → in_progress");
+            $this->info("  [#{$match->external_id}] → in_progress");
         }
 
-        // Update live score (no job dispatch; confirmed_at stays null)
         $score = $api->liveScore($apiMatch);
+
         MatchResult::updateOrCreate(
-            ['match_id' => $match->id],
-            ['home_score' => $score['home'], 'away_score' => $score['away'], 'confirmed_at' => null]
+            ['match_id'    => $match->id],
+            ['home_score'  => $score['home'], 'away_score' => $score['away'], 'confirmed_at' => null]
         );
 
         $this->line("  [#{$match->external_id}] score {$score['home']}–{$score['away']} (live)");
     }
 
-    private function applyFinishedOrOther(GameMatch $match, array $apiMatch, FootballDataService $api): void
+    private function applyFinished(GameMatch $match, array $apiMatch): void
     {
-        $apiStatus = $apiMatch['status'] ?? 'UNKNOWN';
-        $mapped    = $api->mapStatus($apiStatus);
-
-        if ($mapped === 'finished' && $match->status !== 'finished') {
-            $homeScore = (int) ($apiMatch['score']['fullTime']['home'] ?? 0);
-            $awayScore = (int) ($apiMatch['score']['fullTime']['away'] ?? 0);
-
-            $existing = MatchResult::where('match_id', $match->id)->first();
-
-            if ($existing) {
-                $existing->update([
-                    'home_score'   => $homeScore,
-                    'away_score'   => $awayScore,
-                    'confirmed_at' => now(),
-                ]);
-                RecalculateMatchScoresJob::dispatch($existing);
-            } else {
-                $result = MatchResult::create([
-                    'match_id'     => $match->id,
-                    'home_score'   => $homeScore,
-                    'away_score'   => $awayScore,
-                    'confirmed_at' => now(),
-                ]);
-                CalculateScoresJob::dispatch($result);
-            }
-
-            $match->update(['status' => 'finished']);
-
-            Log::info('[AutoSync] Match finished', [
-                'match_id'    => $match->id,
-                'external_id' => $match->external_id,
-                'score'       => "{$homeScore}-{$awayScore}",
-            ]);
-            $this->info("  [#{$match->external_id}] FINISHED {$homeScore}–{$awayScore} → scores queued");
-
-        } elseif ($mapped === 'cancelled' && $match->status !== 'cancelled') {
-            $match->update(['status' => 'cancelled']);
-            Log::warning('[AutoSync] Match cancelled', ['match_id' => $match->id]);
-            $this->warn("  [#{$match->external_id}] cancelled");
+        if ($match->status === 'finished') {
+            return;
         }
+
+        $homeScore = (int) ($apiMatch['score']['fullTime']['home'] ?? 0);
+        $awayScore = (int) ($apiMatch['score']['fullTime']['away'] ?? 0);
+
+        $existing = MatchResult::where('match_id', $match->id)->first();
+
+        if ($existing) {
+            $existing->update([
+                'home_score'   => $homeScore,
+                'away_score'   => $awayScore,
+                'confirmed_at' => now(),
+            ]);
+            RecalculateMatchScoresJob::dispatch($existing);
+        } else {
+            $result = MatchResult::create([
+                'match_id'     => $match->id,
+                'home_score'   => $homeScore,
+                'away_score'   => $awayScore,
+                'confirmed_at' => now(),
+            ]);
+            CalculateScoresJob::dispatch($result);
+        }
+
+        $match->update(['status' => 'finished']);
+
+        Log::info('[AutoSync] Match finished', [
+            'match_id'    => $match->id,
+            'external_id' => $match->external_id,
+            'score'       => "{$homeScore}-{$awayScore}",
+        ]);
+        $this->info("  [#{$match->external_id}] FINISHED {$homeScore}–{$awayScore} → scoring queued");
+    }
+
+    private function applyCancelled(GameMatch $match): void
+    {
+        if ($match->status === 'cancelled') {
+            return;
+        }
+
+        $match->update(['status' => 'cancelled']);
+        Log::warning('[AutoSync] Match cancelled', ['match_id' => $match->id]);
+        $this->warn("  [#{$match->external_id}] cancelled");
     }
 }
