@@ -117,16 +117,6 @@ class AutoSyncWcMatches extends Command
             $this->info("  [#{$match->external_id}] → in_progress");
         }
 
-        // Bulk endpoint doesn't include minute — fetch individual match for it
-        try {
-            $detail  = $api->getMatchById($match->external_id);
-            $minute  = $detail['minute']     ?? null;
-            $injTime = $detail['injuryTime'] ?? null;
-        } catch (\Throwable) {
-            $minute  = null;
-            $injTime = null;
-        }
-
         $score = $api->liveScore($apiMatch);
 
         MatchResult::updateOrCreate(
@@ -134,13 +124,7 @@ class AutoSyncWcMatches extends Command
             ['home_score'  => $score['home'], 'away_score' => $score['away'], 'confirmed_at' => null]
         );
 
-        $minLabel = match(true) {
-            $minute !== null && $injTime !== null => "min {$minute}+{$injTime}'",
-            $minute !== null                      => "min {$minute}'",
-            default                               => '',
-        };
-
-        $this->line("  [#{$match->external_id}] marcador {$score['home']}–{$score['away']}" . ($minLabel ? " · {$minLabel}" : '') . ' (live)');
+        $this->line("  [#{$match->external_id}] marcador {$score['home']}–{$score['away']} (live)");
     }
 
     private function applyFinished(GameMatch $match, array $apiMatch): void
