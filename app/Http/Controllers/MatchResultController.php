@@ -6,8 +6,6 @@ use App\Jobs\CalculateScoresJob;
 use App\Jobs\RecalculateMatchScoresJob;
 use App\Models\GameMatch;
 use App\Models\MatchResult;
-use App\Models\Tournament;
-use App\Services\ApiFootballService;
 use App\Services\FootballDataService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -57,112 +55,6 @@ class MatchResultController extends Controller
         $match->update(['status' => $request->status]);
 
         return response()->json(['data' => $match, 'message' => 'Estado del partido actualizado.']);
-    }
-
-    public function syncTournament(Request $request, string $slug, ApiFootballService $api): JsonResponse
-    {
-        // ── DRY RUN: DB writes disabled. Only logs and returns API data. ──────
-        $tournament = Tournament::where('slug', $slug)->firstOrFail();
-
-        $pendingMatches = $tournament->matches()
-            ->whereNotNull('external_id')
-            ->where('scheduled_at', '<=', now())
-            ->whereDoesntHave('result')
-            ->get();
-
-        $pendingSummary = $pendingMatches->map(fn ($m) => [
-            'id'           => $m->id,
-            'external_id'  => $m->external_id,
-            'status'       => $m->status,
-            'scheduled_at' => $m->scheduled_at?->toIso8601String(),
-        ])->toArray();
-
-        \Log::info('[DRY RUN] syncTournament — partidos pendientes', [
-            'tournament' => $slug,
-            'count'      => $pendingMatches->count(),
-            'matches'    => $pendingSummary,
-        ]);
-
-        if ($pendingMatches->isEmpty()) {
-            return response()->json([
-                'data'    => ['dry_run' => true, 'pending_matches' => [], 'fixtures' => []],
-                'message' => '[DRY RUN] No hay partidos pendientes. Sin llamada a la API.',
-            ]);
-        }
-
-        $allFixtures = [];
-        $errors      = [];
-
-        foreach ($pendingMatches->chunk(20) as $chunk) {
-            $ids = $chunk->pluck('external_id')->all();
-
-            \Log::info('[DRY RUN] Llamando a la API con IDs', ['ids' => $ids]);
-
-            try {
-                $fixtures = $api->getFixturesByIds($ids);
-            } catch (\Throwable $e) {
-                $errors[] = $e->getMessage();
-                \Log::error('[DRY RUN] Error en la API', ['error' => $e->getMessage()]);
-                continue;
-            }
-
-            \Log::info('[DRY RUN] Respuesta cruda de la API', [
-                'count'    => count($fixtures),
-                'fixtures' => $fixtures,
-            ]);
-
-            foreach ($fixtures as $fixture) {
-                $externalId  = (string) ($fixture['fixture']['id'] ?? '');
-                $apiStatus   = $fixture['fixture']['status']['short'] ?? '?';
-                $mappedStatus = $api->mapStatus($apiStatus);
-                $match       = $chunk->firstWhere('external_id', $externalId);
-
-                $entry = [
-                    'external_id'    => $externalId,
-                    'match_id'       => $match?->id,
-                    'home_team'      => $fixture['teams']['home']['name'] ?? null,
-                    'away_team'      => $fixture['teams']['away']['name'] ?? null,
-                    'api_status'     => $apiStatus,
-                    'mapped_status'  => $mappedStatus,
-                    'home_score'     => $fixture['goals']['home'] ?? null,
-                    'away_score'     => $fixture['goals']['away'] ?? null,
-                    'would_sync'     => $mappedStatus === 'finished',
-                ];
-
-                \Log::info('[DRY RUN] Fixture procesado', $entry);
-                $allFixtures[] = $entry;
-
-                // ── DB WRITES DISABLED ──────────────────────────────────────
-                // if ($mappedStatus !== 'finished' || !$match) { continue; }
-                //
-                // $result = MatchResult::create([
-                //     'match_id'     => $match->id,
-                //     'home_score'   => $fixture['goals']['home'] ?? 0,
-                //     'away_score'   => $fixture['goals']['away'] ?? 0,
-                //     'confirmed_at' => now(),
-                // ]);
-                // $match->update(['status' => 'finished']);
-                // CalculateScoresJob::dispatch($result);
-                // ───────────────────────────────────────────────────────────
-            }
-        }
-
-        \Log::info('[DRY RUN] Resumen final', [
-            'total_fixtures' => count($allFixtures),
-            'would_sync'     => collect($allFixtures)->where('would_sync', true)->count(),
-            'errors'         => $errors,
-        ]);
-
-        return response()->json([
-            'data' => [
-                'dry_run'         => true,
-                'pending_matches' => $pendingSummary,
-                'fixtures'        => $allFixtures,
-                'would_sync'      => collect($allFixtures)->where('would_sync', true)->count(),
-                'errors'          => $errors,
-            ],
-            'message' => '[DRY RUN] Ningún dato fue modificado. Revisa los logs o esta respuesta para ver el resultado.',
-        ]);
     }
 
     public function testFootballData(FootballDataService $api): JsonResponse
