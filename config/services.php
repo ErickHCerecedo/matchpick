@@ -33,6 +33,11 @@ return [
         'base_url' => 'https://v3.football.api-sports.io',
     ],
 
+    'footballdata' => [
+        'token'    => env('FOOTBALLDATA_TOKEN', 'ad9402607a8e4681aac936e56dcb4c93'),
+        'base_url' => 'https://api.football-data.org/v4',
+    ],
+
     'cloudinary' => [
         'cloud_name' => env('CLOUDINARY_CLOUD_NAME', 'dr0klvutj'),
         'api_key'    => env('CLOUDINARY_API_KEY', '683293141245113'),

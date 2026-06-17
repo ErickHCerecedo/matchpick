@@ -87,6 +87,7 @@ Route::middleware(['auth:sanctum', 'is_admin'])->prefix('admin')->group(function
     Route::post('/matches/{match}/results', [MatchResultController::class, 'store']);
     Route::patch('/matches/{match}/status', [MatchResultController::class, 'updateStatus']);
     Route::post('/tournaments/{slug}/sync-results', [MatchResultController::class, 'syncTournament']);
+    Route::get('/football-data/test', [MatchResultController::class, 'testFootballData']);
     Route::get('/tournaments', [TournamentAdminController::class, 'index']);
     Route::patch('/tournaments/{tournament}', [TournamentAdminController::class, 'update']);
     Route::patch('/teams/{team}', [TournamentAdminController::class, 'updateTeam']);

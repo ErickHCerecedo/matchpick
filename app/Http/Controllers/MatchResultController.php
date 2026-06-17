@@ -8,6 +8,7 @@ use App\Models\GameMatch;
 use App\Models\MatchResult;
 use App\Models\Tournament;
 use App\Services\ApiFootballService;
+use App\Services\FootballDataService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -162,5 +163,42 @@ class MatchResultController extends Controller
             ],
             'message' => '[DRY RUN] Ningún dato fue modificado. Revisa los logs o esta respuesta para ver el resultado.',
         ]);
+    }
+
+    public function testFootballData(FootballDataService $api): JsonResponse
+    {
+        try {
+            $raw = $api->getWorldCupMatches();
+
+            $matches = collect($raw['matches'] ?? [])->map(fn ($m) => [
+                'id'          => $m['id'],
+                'date'        => substr($m['utcDate'] ?? '', 0, 10),
+                'time'        => substr($m['utcDate'] ?? '', 11, 5) . ' UTC',
+                'status'      => $m['status'],
+                'home'        => $m['homeTeam']['name'] ?? 'TBD',
+                'away'        => $m['awayTeam']['name'] ?? 'TBD',
+                'score_home'  => $m['score']['fullTime']['home'] ?? null,
+                'score_away'  => $m['score']['fullTime']['away'] ?? null,
+                'matchday'    => $m['matchday'] ?? null,
+                'stage'       => $m['stage'] ?? null,
+            ])->values()->all();
+
+            return response()->json([
+                'data' => [
+                    'ok'           => true,
+                    'total'        => $raw['resultSet']['count'] ?? count($matches),
+                    'competition'  => $raw['competition']['name'] ?? null,
+                    'season'       => $raw['filters']['season'] ?? null,
+                    'rate_limit'   => $raw['_rate_limit'] ?? null,
+                    'matches'      => $matches,
+                ],
+                'message' => 'Conexión exitosa a football-data.org',
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'data'    => ['ok' => false],
+                'message' => 'Error: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 }
