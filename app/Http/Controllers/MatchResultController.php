@@ -60,6 +60,7 @@ class MatchResultController extends Controller
 
     public function syncTournament(Request $request, string $slug, ApiFootballService $api): JsonResponse
     {
+        // ── DRY RUN: DB writes disabled. Only logs and returns API data. ──────
         $tournament = Tournament::where('slug', $slug)->firstOrFail();
 
         $pendingMatches = $tournament->matches()
@@ -68,60 +69,98 @@ class MatchResultController extends Controller
             ->whereDoesntHave('result')
             ->get();
 
+        $pendingSummary = $pendingMatches->map(fn ($m) => [
+            'id'           => $m->id,
+            'external_id'  => $m->external_id,
+            'status'       => $m->status,
+            'scheduled_at' => $m->scheduled_at?->toIso8601String(),
+        ])->toArray();
+
+        \Log::info('[DRY RUN] syncTournament — partidos pendientes', [
+            'tournament' => $slug,
+            'count'      => $pendingMatches->count(),
+            'matches'    => $pendingSummary,
+        ]);
+
         if ($pendingMatches->isEmpty()) {
             return response()->json([
-                'data'    => ['synced' => 0],
-                'message' => 'No hay partidos pendientes de resultado para sincronizar.',
+                'data'    => ['dry_run' => true, 'pending_matches' => [], 'fixtures' => []],
+                'message' => '[DRY RUN] No hay partidos pendientes. Sin llamada a la API.',
             ]);
         }
 
-        $synced = 0;
-        $errors = [];
+        $allFixtures = [];
+        $errors      = [];
 
         foreach ($pendingMatches->chunk(20) as $chunk) {
+            $ids = $chunk->pluck('external_id')->all();
+
+            \Log::info('[DRY RUN] Llamando a la API con IDs', ['ids' => $ids]);
+
             try {
-                $fixtures = $api->getFixturesByIds($chunk->pluck('external_id')->all());
+                $fixtures = $api->getFixturesByIds($ids);
             } catch (\Throwable $e) {
                 $errors[] = $e->getMessage();
+                \Log::error('[DRY RUN] Error en la API', ['error' => $e->getMessage()]);
                 continue;
             }
 
+            \Log::info('[DRY RUN] Respuesta cruda de la API', [
+                'count'    => count($fixtures),
+                'fixtures' => $fixtures,
+            ]);
+
             foreach ($fixtures as $fixture) {
-                $status = $api->mapStatus($fixture['fixture']['status']['short']);
+                $externalId  = (string) ($fixture['fixture']['id'] ?? '');
+                $apiStatus   = $fixture['fixture']['status']['short'] ?? '?';
+                $mappedStatus = $api->mapStatus($apiStatus);
+                $match       = $chunk->firstWhere('external_id', $externalId);
 
-                if ($status !== 'finished') {
-                    continue;
-                }
+                $entry = [
+                    'external_id'    => $externalId,
+                    'match_id'       => $match?->id,
+                    'home_team'      => $fixture['teams']['home']['name'] ?? null,
+                    'away_team'      => $fixture['teams']['away']['name'] ?? null,
+                    'api_status'     => $apiStatus,
+                    'mapped_status'  => $mappedStatus,
+                    'home_score'     => $fixture['goals']['home'] ?? null,
+                    'away_score'     => $fixture['goals']['away'] ?? null,
+                    'would_sync'     => $mappedStatus === 'finished',
+                ];
 
-                $match = $chunk->firstWhere('external_id', (string) $fixture['fixture']['id']);
-                if (!$match) {
-                    continue;
-                }
+                \Log::info('[DRY RUN] Fixture procesado', $entry);
+                $allFixtures[] = $entry;
 
-                $result = MatchResult::create([
-                    'match_id'     => $match->id,
-                    'home_score'   => $fixture['goals']['home'] ?? 0,
-                    'away_score'   => $fixture['goals']['away'] ?? 0,
-                    'confirmed_at' => now(),
-                ]);
-
-                $match->update(['status' => 'finished']);
-                CalculateScoresJob::dispatch($result);
-                $synced++;
+                // ── DB WRITES DISABLED ──────────────────────────────────────
+                // if ($mappedStatus !== 'finished' || !$match) { continue; }
+                //
+                // $result = MatchResult::create([
+                //     'match_id'     => $match->id,
+                //     'home_score'   => $fixture['goals']['home'] ?? 0,
+                //     'away_score'   => $fixture['goals']['away'] ?? 0,
+                //     'confirmed_at' => now(),
+                // ]);
+                // $match->update(['status' => 'finished']);
+                // CalculateScoresJob::dispatch($result);
+                // ───────────────────────────────────────────────────────────
             }
         }
 
-        $message = $synced > 0
-            ? "{$synced} resultado(s) sincronizado(s). Los puntajes se están calculando."
-            : 'Los partidos aún no han terminado según la API.';
-
-        if (!empty($errors)) {
-            $message .= ' Advertencia: ' . implode('; ', $errors);
-        }
+        \Log::info('[DRY RUN] Resumen final', [
+            'total_fixtures' => count($allFixtures),
+            'would_sync'     => collect($allFixtures)->where('would_sync', true)->count(),
+            'errors'         => $errors,
+        ]);
 
         return response()->json([
-            'data'    => ['synced' => $synced],
-            'message' => $message,
+            'data' => [
+                'dry_run'         => true,
+                'pending_matches' => $pendingSummary,
+                'fixtures'        => $allFixtures,
+                'would_sync'      => collect($allFixtures)->where('would_sync', true)->count(),
+                'errors'          => $errors,
+            ],
+            'message' => '[DRY RUN] Ningún dato fue modificado. Revisa los logs o esta respuesta para ver el resultado.',
         ]);
     }
 }
