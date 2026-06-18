@@ -13,16 +13,17 @@ use Illuminate\Support\Facades\Log;
 /**
  * Runs every minute via the Laravel scheduler.
  *
- * Strategy (simple & reliable):
+ * Strategy:
  *   1. Build a watchlist: matches with external_id that are scheduled (past
  *      kick-off) or in_progress.
  *   2. If the watchlist is empty → exit immediately (0 API calls).
- *   3. Fetch ALL WC matches from football-data.org in ONE call (no status
- *      filter — avoids API quirks with comma-separated values).
- *   4. For each watched match, apply the API status directly:
- *        in_progress → update status + live score (no scoring jobs)
- *        finished    → save confirmed result + dispatch scoring job
- *        cancelled   → mark cancelled
+ *   3. Fetch ALL WC matches from football-data.org in ONE call.
+ *   4. For each watched match:
+ *        - If scheduled AND scheduled_at has passed → start immediately
+ *          (do NOT wait for the API to report IN_PLAY, which can lag 5-15 min)
+ *        - If API reports FINISHED → save confirmed result + dispatch scoring job
+ *        - If API reports CANCELLED → mark cancelled
+ *        - If in_progress → update live score from API
  *
  * Usage:
  *   php artisan matches:wc-auto-sync
@@ -76,13 +77,18 @@ class AutoSyncWcMatches extends Command
                 : '?';
 
             $this->line("  [#{$match->external_id}] kickoff: {$kickoff} · API status: {$apiStatus}");
-            $this->line("  [#{$match->external_id}] raw: " . json_encode($apiMatch, JSON_UNESCAPED_UNICODE));
 
+            // Start by scheduled time — don't wait for the API to say IN_PLAY
+            if ($match->status === 'scheduled') {
+                $this->applyLive($match, $apiMatch, $api);
+                continue;
+            }
+
+            // Match is already in_progress — check API for finish/cancel/score update
             match ($mapped) {
-                'in_progress' => $this->applyLive($match, $apiMatch, $api),
-                'finished'    => $this->applyFinished($match, $apiMatch),
-                'cancelled'   => $this->applyCancelled($match),
-                default       => null, // SCHEDULED / TIMED / POSTPONED — no action yet
+                'finished'  => $this->applyFinished($match, $apiMatch),
+                'cancelled' => $this->applyCancelled($match),
+                default     => $this->applyLive($match, $apiMatch, $api),
             };
         }
 
