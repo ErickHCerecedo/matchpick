@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\GameMatch;
+use App\Models\Quiniela;
 use App\Models\Team;
 use App\Models\Tournament;
 use Illuminate\Http\JsonResponse;
@@ -111,6 +112,33 @@ class TournamentAdminController extends Controller
                 'away_placeholder' => $match->away_placeholder,
             ],
         ]);
+    }
+
+    public function quinielas(Tournament $tournament): JsonResponse
+    {
+        $quinielas = Quiniela::where('tournament_id', $tournament->id)
+            ->with(['creator:id,name,email', 'participants:id,name,email'])
+            ->withCount('participants')
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(fn ($q) => [
+                'id'                 => $q->id,
+                'name'               => $q->name,
+                'slug'               => $q->slug,
+                'type'               => $q->type,
+                'participants_count' => $q->participants_count,
+                'creator'            => $q->creator
+                    ? ['id' => $q->creator->id, 'name' => $q->creator->name, 'email' => $q->creator->email]
+                    : null,
+                'participants'       => $q->participants->map(fn ($u) => [
+                    'id'    => $u->id,
+                    'name'  => $u->name,
+                    'email' => $u->email,
+                    'role'  => $u->pivot->role,
+                ]),
+            ]);
+
+        return response()->json(['data' => $quinielas]);
     }
 
     private function tournamentData(Tournament $t): array

@@ -91,6 +91,7 @@ Route::middleware(['auth:sanctum', 'is_admin'])->prefix('admin')->group(function
     Route::get('/football-data/match-status', [MatchResultController::class, 'apiMatchStatus']);
     Route::post('/football-data/run-sync', [MatchResultController::class, 'runSync']);
     Route::get('/tournaments', [TournamentAdminController::class, 'index']);
+    Route::get('/tournaments/{tournament}/quinielas', [TournamentAdminController::class, 'quinielas']);
     Route::patch('/tournaments/{tournament}', [TournamentAdminController::class, 'update']);
     Route::patch('/teams/{team}', [TournamentAdminController::class, 'updateTeam']);
     Route::patch('/matches/{match}', [TournamentAdminController::class, 'updateMatch']);
