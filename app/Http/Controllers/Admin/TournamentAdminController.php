@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\GameMatch;
 use App\Models\Quiniela;
+use App\Models\Standing;
 use App\Models\Team;
 use App\Models\Tournament;
 use Illuminate\Http\JsonResponse;
@@ -120,8 +121,30 @@ class TournamentAdminController extends Controller
             ->with(['creator:id,name,email', 'participants:id,name,email'])
             ->withCount('participants')
             ->orderByDesc('created_at')
+            ->get();
+
+        // Load standings for all quinielas in one query
+        $quinielaIds = $quinielas->pluck('id');
+        $standings   = Standing::whereIn('quiniela_id', $quinielaIds)
             ->get()
-            ->map(fn ($q) => [
+            ->groupBy('quiniela_id');
+
+        $data = $quinielas->map(function ($q) use ($standings) {
+            $qStandings = $standings->get($q->id, collect())->keyBy('user_id');
+
+            $participants = $q->participants->map(function ($u) use ($qStandings) {
+                $s = $qStandings->get($u->id);
+                return [
+                    'id'           => $u->id,
+                    'name'         => $u->name,
+                    'email'        => $u->email,
+                    'role'         => $u->pivot->role,
+                    'total_points' => $s?->total_points ?? 0,
+                    'rank'         => $s?->rank ?? null,
+                ];
+            })->sortBy('rank')->values();
+
+            return [
                 'id'                 => $q->id,
                 'name'               => $q->name,
                 'slug'               => $q->slug,
@@ -130,15 +153,11 @@ class TournamentAdminController extends Controller
                 'creator'            => $q->creator
                     ? ['id' => $q->creator->id, 'name' => $q->creator->name, 'email' => $q->creator->email]
                     : null,
-                'participants'       => $q->participants->map(fn ($u) => [
-                    'id'    => $u->id,
-                    'name'  => $u->name,
-                    'email' => $u->email,
-                    'role'  => $u->pivot->role,
-                ]),
-            ]);
+                'participants'       => $participants,
+            ];
+        });
 
-        return response()->json(['data' => $quinielas]);
+        return response()->json(['data' => $data]);
     }
 
     private function tournamentData(Tournament $t): array
