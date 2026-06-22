@@ -45,7 +45,8 @@ class FootballDataService
         return match ($apiStatus) {
             'IN_PLAY', 'PAUSED', 'HALFTIME'           => 'in_progress',
             'FINISHED'                                  => 'finished',
-            'POSTPONED', 'CANCELLED', 'SUSPENDED'      => 'cancelled',
+            'POSTPONED', 'SUSPENDED'                    => 'postponed',
+            'CANCELLED'                                 => 'cancelled',
             default                                     => null,
         };
     }
