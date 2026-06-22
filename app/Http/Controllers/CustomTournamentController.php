@@ -298,7 +298,7 @@ class CustomTournamentController extends Controller
             'away_team_id' => 'sometimes|integer|exists:teams,id|different:home_team_id',
             'scheduled_at' => 'sometimes|date',
             'venue'        => 'nullable|string|max:200',
-            'status'       => 'sometimes|in:scheduled,in_progress,finished,cancelled',
+            'status'       => 'sometimes|in:scheduled,in_progress,finished,cancelled,postponed',
         ]);
 
         if (isset($data['scheduled_at'])) {
@@ -374,7 +374,7 @@ class CustomTournamentController extends Controller
         $match = GameMatch::where('id', $matchId)->where('round_id', $round->id)->firstOrFail();
 
         $request->validate([
-            'status' => 'required|in:scheduled,in_progress,finished,cancelled',
+            'status' => 'required|in:scheduled,in_progress,finished,cancelled,postponed',
         ]);
 
         $match->update(['status' => $request->status]);
