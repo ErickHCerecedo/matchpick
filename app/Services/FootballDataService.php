@@ -43,11 +43,13 @@ class FootballDataService
     public function mapStatus(string $apiStatus): ?string
     {
         return match ($apiStatus) {
-            'IN_PLAY', 'PAUSED', 'HALFTIME'           => 'in_progress',
-            'FINISHED'                                  => 'finished',
-            'POSTPONED', 'SUSPENDED'                    => 'postponed',
-            'CANCELLED'                                 => 'cancelled',
-            default                                     => null,
+            'IN_PLAY'              => 'in_progress',
+            'PAUSED', 'HALFTIME'   => 'paused',
+            'FINISHED'             => 'finished',
+            'POSTPONED'            => 'postponed',
+            'SUSPENDED'            => 'suspended',
+            'CANCELLED'            => 'cancelled',
+            default                => null,
         };
     }
 

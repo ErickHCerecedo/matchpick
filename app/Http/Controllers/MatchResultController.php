@@ -53,7 +53,7 @@ class MatchResultController extends Controller
     public function updateStatus(Request $request, GameMatch $match): JsonResponse
     {
         $request->validate([
-            'status' => 'required|in:scheduled,in_progress,finished,cancelled,postponed',
+            'status' => 'required|in:scheduled,in_progress,finished,cancelled,postponed,suspended,paused,rescheduled',
         ]);
 
         $match->update(['status' => $request->status]);

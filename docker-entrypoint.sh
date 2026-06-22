@@ -3,7 +3,6 @@ set -e
 
 php artisan config:cache
 php artisan migrate --force
-php artisan db:seed --force
 
 # Keep schedule:work alive — restart automatically if it exits for any reason
 (while true; do

@@ -84,11 +84,13 @@ class AutoSyncWcMatches extends Command
                 continue;
             }
 
-            // Match is already in_progress — check API for finish/cancel/postpone/score update
+            // Match is already in_progress — check API for finish/cancel/postpone/suspend/score update
             match ($mapped) {
                 'finished'   => $this->applyFinished($match, $apiMatch),
                 'cancelled'  => $this->applyCancelled($match),
-                'postponed'  => $this->applyPostponed($match),
+                'postponed'  => $this->applySimpleStatus($match, 'postponed', 'postponed'),
+                'suspended'  => $this->applySimpleStatus($match, 'suspended', 'suspended'),
+                'paused'     => $this->applyLive($match, $apiMatch, $api), // halftime: keep in_progress, update score
                 default      => $this->applyLive($match, $apiMatch, $api),
             };
         }
@@ -183,14 +185,12 @@ class AutoSyncWcMatches extends Command
         $this->warn("  [#{$match->external_id}] cancelled");
     }
 
-    private function applyPostponed(GameMatch $match): void
+    private function applySimpleStatus(GameMatch $match, string $status, string $logKey): void
     {
-        if ($match->status === 'postponed') {
-            return;
-        }
+        if ($match->status === $status) return;
 
-        $match->update(['status' => 'postponed']);
-        Log::warning('[AutoSync] Match postponed', ['match_id' => $match->id]);
-        $this->warn("  [#{$match->external_id}] postponed");
+        $match->update(['status' => $status]);
+        Log::warning("[AutoSync] Match {$logKey}", ['match_id' => $match->id]);
+        $this->warn("  [#{$match->external_id}] → {$status}");
     }
 }
