@@ -76,7 +76,7 @@ class PredictionController extends Controller
         $quiniela = Quiniela::where('slug', $slug)->firstOrFail();
         $authUser = $request->user();
 
-        if (!$quiniela->participants()->where('user_id', $authUser->id)->exists()) {
+        if (!$authUser->is_admin && !$quiniela->participants()->where('user_id', $authUser->id)->exists()) {
             return response()->json(['message' => 'You are not a participant of this quiniela.'], 403);
         }
 
