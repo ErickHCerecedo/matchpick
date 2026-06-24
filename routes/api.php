@@ -10,6 +10,7 @@ use App\Http\Controllers\StandingController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\MatchResultController;
 use App\Http\Controllers\QuinielaResultController;
+use App\Http\Controllers\WildcardController;
 use App\Http\Controllers\Admin\TournamentAdminController;
 use App\Http\Controllers\Admin\SiteSettingController;
 use App\Http\Controllers\ProfileController;
@@ -80,6 +81,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/quinielas/{slug}/delete-status', [QuinielaController::class, 'deleteStatus']);
     Route::post('/quinielas/{slug}/delete-votes', [QuinielaController::class, 'castDeleteVote']);
     Route::delete('/quinielas/{slug}/delete-votes', [QuinielaController::class, 'revokeDeleteVote']);
+
+    // Wildcard
+    Route::get('/quinielas/{slug}/wildcard', [WildcardController::class, 'show']);
+    Route::post('/quinielas/{slug}/wildcard', [WildcardController::class, 'save']);
 });
 
 // Admin routes
@@ -92,6 +97,8 @@ Route::middleware(['auth:sanctum', 'is_admin'])->prefix('admin')->group(function
     Route::post('/football-data/run-sync', [MatchResultController::class, 'runSync']);
     Route::get('/tournaments', [TournamentAdminController::class, 'index']);
     Route::get('/tournaments/{tournament}/quinielas', [TournamentAdminController::class, 'quinielas']);
+    Route::get('/tournaments/{tournament}/wildcard-teams', [TournamentAdminController::class, 'wildcardTeams']);
+    Route::put('/tournaments/{tournament}/wildcard-teams', [TournamentAdminController::class, 'setWildcardTeams']);
     Route::patch('/tournaments/{tournament}', [TournamentAdminController::class, 'update']);
     Route::patch('/teams/{team}', [TournamentAdminController::class, 'updateTeam']);
     Route::patch('/matches/{match}', [TournamentAdminController::class, 'updateMatch']);

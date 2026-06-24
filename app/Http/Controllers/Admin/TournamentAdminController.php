@@ -160,6 +160,50 @@ class TournamentAdminController extends Controller
         return response()->json(['data' => $data]);
     }
 
+    /** GET /admin/tournaments/{tournament}/wildcard-teams */
+    public function wildcardTeams(Tournament $tournament): JsonResponse
+    {
+        $ids   = $tournament->meta['wildcard_team_ids'] ?? [];
+        $teams = Team::with('country')->whereIn('id', $ids)->get()
+            ->map(fn($t) => [
+                'id'         => $t->id,
+                'name'       => $t->name,
+                'short_name' => $t->short_name,
+                'flag_url'   => $t->logo_url ?? $t->country?->flag_url,
+            ])->values();
+
+        // Also return all teams for the tournament so admin can pick from them
+        $allTeams = Team::with('country')
+            ->where('tournament_id', $tournament->id)
+            ->get()
+            ->map(fn($t) => [
+                'id'         => $t->id,
+                'name'       => $t->name,
+                'short_name' => $t->short_name,
+                'flag_url'   => $t->logo_url ?? $t->country?->flag_url,
+            ])->values();
+
+        return response()->json(['data' => [
+            'eligible_teams' => $teams,
+            'all_teams'      => $allTeams,
+        ]]);
+    }
+
+    /** PUT /admin/tournaments/{tournament}/wildcard-teams */
+    public function setWildcardTeams(Request $request, Tournament $tournament): JsonResponse
+    {
+        $validated = $request->validate([
+            'team_ids'   => 'required|array|max:64',
+            'team_ids.*' => 'integer|exists:teams,id',
+        ]);
+
+        $meta = $tournament->meta ?? [];
+        $meta['wildcard_team_ids'] = array_values(array_unique($validated['team_ids']));
+        $tournament->update(['meta' => $meta]);
+
+        return response()->json(['message' => 'Equipos del comodín actualizados.']);
+    }
+
     private function tournamentData(Tournament $t): array
     {
         return [
