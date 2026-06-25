@@ -10,6 +10,7 @@ use App\Models\Team;
 use App\Models\Tournament;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class TournamentAdminController extends Controller
 {
@@ -165,28 +166,45 @@ class TournamentAdminController extends Controller
     {
         $ids   = $tournament->meta['wildcard_team_ids'] ?? [];
         $teams = Team::with('country')->whereIn('id', $ids)->get()
-            ->map(fn($t) => [
-                'id'         => $t->id,
-                'name'       => $t->name,
-                'short_name' => $t->short_name,
-                'flag_url'   => $t->logo_url ?? $t->country?->flag_url,
-            ])->values();
+            ->map(fn($t) => $this->teamShape($t))->values();
 
-        // Also return all teams for the tournament so admin can pick from them
-        $allTeams = Team::with('country')
-            ->where('tournament_id', $tournament->id)
-            ->get()
-            ->map(fn($t) => [
-                'id'         => $t->id,
-                'name'       => $t->name,
-                'short_name' => $t->short_name,
-                'flag_url'   => $t->logo_url ?? $t->country?->flag_url,
-            ])->values();
+        // Official tournaments: teams come from match participants (tournament_id is null on those rows).
+        // Custom tournaments: teams are scoped directly via tournament_id.
+        if ($tournament->is_custom) {
+            $allTeams = Team::with('country')
+                ->where('tournament_id', $tournament->id)
+                ->get()
+                ->map(fn($t) => $this->teamShape($t))->values();
+        } else {
+            $teamIds = \DB::table('matches')
+                ->join('rounds', 'rounds.id', '=', 'matches.round_id')
+                ->where('rounds.tournament_id', $tournament->id)
+                ->whereNotNull('matches.home_team_id')
+                ->whereNotNull('matches.away_team_id')
+                ->selectRaw('DISTINCT UNNEST(ARRAY[matches.home_team_id, matches.away_team_id]) AS team_id')
+                ->pluck('team_id');
+
+            $allTeams = Team::with('country')
+                ->whereIn('id', $teamIds)
+                ->orderBy('name')
+                ->get()
+                ->map(fn($t) => $this->teamShape($t))->values();
+        }
 
         return response()->json(['data' => [
             'eligible_teams' => $teams,
             'all_teams'      => $allTeams,
         ]]);
+    }
+
+    private function teamShape(Team $team): array
+    {
+        return [
+            'id'         => $team->id,
+            'name'       => $team->name,
+            'short_name' => $team->short_name,
+            'flag_url'   => $team->logo_url ?? $team->country?->flag_url,
+        ];
     }
 
     /** PUT /admin/tournaments/{tournament}/wildcard-teams */
