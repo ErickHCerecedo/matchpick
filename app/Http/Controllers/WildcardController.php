@@ -13,11 +13,48 @@ class WildcardController extends Controller
     // June 28 2026 13:00 Mexico Central (UTC-6) = 19:00 UTC
     private const DEADLINE = '2026-06-28T19:00:00Z';
 
+    // Points by podium place: 1st=9, 2nd=6, 3rd=3
+    private const POINTS_BY_PLACE = [1 => 9, 2 => 6, 3 => 3];
+
     private function isOpen(): bool
     {
         return now()->lt(new \DateTime(self::DEADLINE));
     }
 
+    /** Shape a team with per-pick earned points based on the confirmed podium. */
+    private function pickShape(Team $team, ?array $podium): array
+    {
+        $points = null;
+        $place  = null;
+
+        if ($podium !== null) {
+            $allSet = !empty($podium['first']) && !empty($podium['second']) && !empty($podium['third']);
+
+            foreach ([1 => 'first', 2 => 'second', 3 => 'third'] as $pos => $key) {
+                if (isset($podium[$key]) && (int) $podium[$key] === $team->id) {
+                    $place  = $pos;
+                    $points = self::POINTS_BY_PLACE[$pos];
+                    break;
+                }
+            }
+
+            // Once all 3 positions are confirmed, unmatched teams earn 0
+            if ($points === null && $allSet) {
+                $points = 0;
+            }
+        }
+
+        return [
+            'id'         => $team->id,
+            'name'       => $team->name,
+            'short_name' => $team->short_name,
+            'flag_url'   => $team->logo_url ?? $team->country?->flag_url,
+            'points'     => $points, // null=undetermined, 0=no points, 3/6/9=earned
+            'place'      => $place,  // null=not placed, 1/2/3=position
+        ];
+    }
+
+    /** Basic team shape without podium info (used in save response). */
     private function teamShape(Team $team): array
     {
         return [
@@ -43,13 +80,15 @@ class WildcardController extends Controller
             return response()->json(['message' => 'Forbidden.'], 403);
         }
 
+        $podium = $quiniela->tournament->meta['wildcard_podium'] ?? null;
+
         $wildcards = Wildcard::with(['user:id,name', 'team1.country', 'team2.country', 'team3.country'])
             ->where('quiniela_id', $quiniela->id)
             ->get()
-            ->map(function ($wc) {
+            ->map(function ($wc) use ($podium) {
                 $picks = [];
                 foreach (['team1', 'team2', 'team3'] as $rel) {
-                    if ($wc->$rel) $picks[] = $this->teamShape($wc->$rel);
+                    if ($wc->$rel) $picks[] = $this->pickShape($wc->$rel, $podium);
                 }
                 return [
                     'user_id'       => $wc->user_id,
@@ -72,6 +111,8 @@ class WildcardController extends Controller
             return response()->json(['message' => 'Not a participant.'], 403);
         }
 
+        $podium = $quiniela->tournament->meta['wildcard_podium'] ?? null;
+
         // Eligible teams from tournament meta
         $eligibleTeamIds = $quiniela->tournament->meta['wildcard_team_ids'] ?? [];
         $eligibleTeams   = Team::with('country')
@@ -89,7 +130,7 @@ class WildcardController extends Controller
         if ($wildcard) {
             foreach (['team1', 'team2', 'team3'] as $rel) {
                 if ($wildcard->$rel) {
-                    $picks[] = $this->teamShape($wildcard->$rel);
+                    $picks[] = $this->pickShape($wildcard->$rel, $podium);
                 }
             }
         }

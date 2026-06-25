@@ -7,6 +7,7 @@ use App\Models\GameMatch;
 use App\Models\Quiniela;
 use App\Models\Standing;
 use App\Models\Team;
+use App\Models\Wildcard;
 use App\Models\Tournament;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -220,6 +221,82 @@ class TournamentAdminController extends Controller
         $tournament->update(['meta' => $meta]);
 
         return response()->json(['message' => 'Equipos del comodín actualizados.']);
+    }
+
+    /** GET /admin/tournaments/{tournament}/wildcard-podium */
+    public function wildcardPodium(Tournament $tournament): JsonResponse
+    {
+        $podium = $tournament->meta['wildcard_podium'] ?? [];
+        $result = [];
+        foreach (['first', 'second', 'third'] as $place) {
+            $teamId = $podium[$place] ?? null;
+            $team   = $teamId ? Team::with('country')->find($teamId) : null;
+            $result[$place] = $team ? $this->teamShape($team) : null;
+        }
+        return response()->json(['data' => $result]);
+    }
+
+    /** PUT /admin/tournaments/{tournament}/wildcard-podium */
+    public function setWildcardPodium(Request $request, Tournament $tournament): JsonResponse
+    {
+        $validated = $request->validate([
+            'first'  => 'nullable|integer|exists:teams,id',
+            'second' => 'nullable|integer|exists:teams,id',
+            'third'  => 'nullable|integer|exists:teams,id',
+        ]);
+
+        $meta = $tournament->meta ?? [];
+        $meta['wildcard_podium'] = $validated;
+        $tournament->update(['meta' => $meta]);
+
+        $this->recalculateWildcardPoints($tournament, $validated);
+
+        return response()->json(['message' => 'Podio actualizado.', 'data' => $validated]);
+    }
+
+    private function recalculateWildcardPoints(Tournament $tournament, array $podium): void
+    {
+        // Build teamId → points map from podium
+        $pointsMap = [];
+        foreach ([1 => 'first', 2 => 'second', 3 => 'third'] as $pts => $key) {
+            if (!empty($podium[$key])) {
+                $pointsMap[(int) $podium[$key]] = [1 => 9, 2 => 6, 3 => 3][$pts];
+            }
+        }
+
+        $quinielaIds = Quiniela::where('tournament_id', $tournament->id)->pluck('id');
+
+        foreach (Wildcard::whereIn('quiniela_id', $quinielaIds)->get() as $wc) {
+            $oldPoints = (int) ($wc->points_earned ?? 0);
+            $newPoints = 0;
+            foreach (['team1_id', 'team2_id', 'team3_id'] as $col) {
+                if ($wc->$col && isset($pointsMap[$wc->$col])) {
+                    $newPoints += $pointsMap[$wc->$col];
+                }
+            }
+            $wc->update(['points_earned' => $newPoints]);
+
+            $diff = $newPoints - $oldPoints;
+            if ($diff !== 0) {
+                $standing = Standing::firstOrCreate(
+                    ['quiniela_id' => $wc->quiniela_id, 'user_id' => $wc->user_id],
+                    ['total_points' => 0, 'exact_scores' => 0, 'correct_results' => 0, 'predictions_made' => 0]
+                );
+                $standing->increment('total_points', $diff);
+            }
+        }
+
+        // Recalculate ranks for all affected quinielas
+        foreach ($quinielaIds as $qid) {
+            $standings = Standing::where('quiniela_id', $qid)
+                ->orderByDesc('total_points')
+                ->orderByDesc('exact_scores')
+                ->orderByDesc('correct_results')
+                ->get();
+            foreach ($standings as $idx => $s) {
+                $s->update(['rank' => $idx + 1]);
+            }
+        }
     }
 
     private function tournamentData(Tournament $t): array
