@@ -151,6 +151,7 @@ class TournamentAdminController extends Controller
                 'name'               => $q->name,
                 'slug'               => $q->slug,
                 'type'               => $q->type,
+                'wildcard_enabled'   => (bool) $q->wildcard_enabled,
                 'participants_count' => $q->participants_count,
                 'creator'            => $q->creator
                     ? ['id' => $q->creator->id, 'name' => $q->creator->name, 'email' => $q->creator->email]
