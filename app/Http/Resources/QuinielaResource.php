@@ -16,6 +16,7 @@ class QuinielaResource extends JsonResource
             'type' => $this->type,
             'is_active' => $this->is_active,
             'predictions_open' => $this->predictions_open,
+            'wildcard_enabled' => (bool) $this->wildcard_enabled,
             'max_participants' => $this->max_participants,
             'participants_count' => $this->participants_count ?? $this->whenLoaded('participants', fn() => $this->participants->count(), 0),
             'my_role' => $this->when(

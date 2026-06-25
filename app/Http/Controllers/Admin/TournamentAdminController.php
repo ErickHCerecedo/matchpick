@@ -223,6 +223,17 @@ class TournamentAdminController extends Controller
         return response()->json(['message' => 'Equipos del comodín actualizados.']);
     }
 
+    /** PATCH /admin/quinielas/{quiniela}/wildcard-enabled */
+    public function setQuinielaWildcard(Request $request, Quiniela $quiniela): JsonResponse
+    {
+        $validated = $request->validate(['enabled' => 'required|boolean']);
+        $quiniela->update(['wildcard_enabled' => $validated['enabled']]);
+        return response()->json([
+            'message' => $validated['enabled'] ? 'Comodín activado.' : 'Comodín desactivado.',
+            'data'    => ['wildcard_enabled' => $quiniela->wildcard_enabled],
+        ]);
+    }
+
     /** GET /admin/tournaments/{tournament}/wildcard-podium */
     public function wildcardPodium(Tournament $tournament): JsonResponse
     {

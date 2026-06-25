@@ -69,7 +69,12 @@ class WildcardController extends Controller
     public function index(Request $request, string $slug): JsonResponse
     {
         $quiniela = Quiniela::where('slug', $slug)->firstOrFail();
-        $user     = $request->user();
+
+        if (!$quiniela->wildcard_enabled) {
+            return response()->json(['message' => 'Wildcard not enabled for this quiniela.'], 404);
+        }
+
+        $user = $request->user();
 
         $isQuinielaAdmin = $quiniela->participants()
             ->where('user_id', $user->id)
@@ -105,7 +110,12 @@ class WildcardController extends Controller
     public function show(Request $request, string $slug): JsonResponse
     {
         $quiniela = Quiniela::where('slug', $slug)->firstOrFail();
-        $user     = $request->user();
+
+        if (!$quiniela->wildcard_enabled) {
+            return response()->json(['message' => 'Wildcard not enabled for this quiniela.'], 404);
+        }
+
+        $user = $request->user();
 
         if (!$quiniela->participants()->where('user_id', $user->id)->exists()) {
             return response()->json(['message' => 'Not a participant.'], 403);
@@ -154,6 +164,10 @@ class WildcardController extends Controller
         }
 
         $quiniela = Quiniela::where('slug', $slug)->firstOrFail();
+
+        if (!$quiniela->wildcard_enabled) {
+            return response()->json(['message' => 'Wildcard not enabled for this quiniela.'], 404);
+        }
         $user     = $request->user();
 
         if (!$quiniela->participants()->where('user_id', $user->id)->exists()) {

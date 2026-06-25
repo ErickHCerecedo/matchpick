@@ -102,6 +102,7 @@ Route::middleware(['auth:sanctum', 'is_admin'])->prefix('admin')->group(function
     Route::put('/tournaments/{tournament}/wildcard-teams', [TournamentAdminController::class, 'setWildcardTeams']);
     Route::get('/tournaments/{tournament}/wildcard-podium', [TournamentAdminController::class, 'wildcardPodium']);
     Route::put('/tournaments/{tournament}/wildcard-podium', [TournamentAdminController::class, 'setWildcardPodium']);
+    Route::patch('/quinielas/{quiniela}/wildcard-enabled', [TournamentAdminController::class, 'setQuinielaWildcard']);
     Route::patch('/tournaments/{tournament}', [TournamentAdminController::class, 'update']);
     Route::patch('/teams/{team}', [TournamentAdminController::class, 'updateTeam']);
     Route::patch('/matches/{match}', [TournamentAdminController::class, 'updateMatch']);
