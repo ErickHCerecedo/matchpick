@@ -28,6 +28,40 @@ class WildcardController extends Controller
         ];
     }
 
+    /** GET /quinielas/{slug}/wildcards — quiniela admin or super admin */
+    public function index(Request $request, string $slug): JsonResponse
+    {
+        $quiniela = Quiniela::where('slug', $slug)->firstOrFail();
+        $user     = $request->user();
+
+        $isQuinielaAdmin = $quiniela->participants()
+            ->where('user_id', $user->id)
+            ->where('role', 'admin')
+            ->exists();
+
+        if (!$isQuinielaAdmin && !$user->is_admin) {
+            return response()->json(['message' => 'Forbidden.'], 403);
+        }
+
+        $wildcards = Wildcard::with(['user:id,name', 'team1.country', 'team2.country', 'team3.country'])
+            ->where('quiniela_id', $quiniela->id)
+            ->get()
+            ->map(function ($wc) {
+                $picks = [];
+                foreach (['team1', 'team2', 'team3'] as $rel) {
+                    if ($wc->$rel) $picks[] = $this->teamShape($wc->$rel);
+                }
+                return [
+                    'user_id'       => $wc->user_id,
+                    'user_name'     => $wc->user->name,
+                    'picks'         => $picks,
+                    'points_earned' => $wc->points_earned,
+                ];
+            });
+
+        return response()->json(['data' => $wildcards]);
+    }
+
     /** GET /quinielas/{slug}/wildcard */
     public function show(Request $request, string $slug): JsonResponse
     {

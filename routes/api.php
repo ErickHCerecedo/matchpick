@@ -83,6 +83,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/quinielas/{slug}/delete-votes', [QuinielaController::class, 'revokeDeleteVote']);
 
     // Wildcard
+    Route::get('/quinielas/{slug}/wildcards', [WildcardController::class, 'index']);
     Route::get('/quinielas/{slug}/wildcard', [WildcardController::class, 'show']);
     Route::post('/quinielas/{slug}/wildcard', [WildcardController::class, 'save']);
 });
