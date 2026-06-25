@@ -229,10 +229,47 @@ class TournamentAdminController extends Controller
     {
         $validated = $request->validate(['enabled' => 'required|boolean']);
         $quiniela->update(['wildcard_enabled' => $validated['enabled']]);
+
+        if (!$validated['enabled']) {
+            // Remove wildcard points from standings and zero out points_earned
+            $this->zeroOutWildcardPoints($quiniela->id);
+        } else {
+            // Re-apply current podium points now that wildcard is re-enabled
+            $podium = $quiniela->tournament->meta['wildcard_podium'] ?? null;
+            if ($podium) {
+                $this->recalculateWildcardPoints($quiniela->tournament, $podium, [$quiniela->id]);
+            }
+        }
+
         return response()->json([
             'message' => $validated['enabled'] ? 'Comodín activado.' : 'Comodín desactivado.',
             'data'    => ['wildcard_enabled' => $quiniela->wildcard_enabled],
         ]);
+    }
+
+    private function zeroOutWildcardPoints(int $quinielaId): void
+    {
+        foreach (Wildcard::where('quiniela_id', $quinielaId)->get() as $wc) {
+            $oldPoints = (int) ($wc->points_earned ?? 0);
+            if ($oldPoints === 0) continue;
+
+            $wc->update(['points_earned' => 0]);
+
+            $standing = Standing::where('quiniela_id', $quinielaId)->where('user_id', $wc->user_id)->first();
+            if ($standing) {
+                $standing->decrement('total_points', $oldPoints);
+            }
+        }
+
+        // Recalculate ranks
+        $standings = Standing::where('quiniela_id', $quinielaId)
+            ->orderByDesc('total_points')
+            ->orderByDesc('exact_scores')
+            ->orderByDesc('correct_results')
+            ->get();
+        foreach ($standings as $idx => $s) {
+            $s->update(['rank' => $idx + 1]);
+        }
     }
 
     /** GET /admin/tournaments/{tournament}/wildcard-podium */
@@ -266,7 +303,7 @@ class TournamentAdminController extends Controller
         return response()->json(['message' => 'Podio actualizado.', 'data' => $validated]);
     }
 
-    private function recalculateWildcardPoints(Tournament $tournament, array $podium): void
+    private function recalculateWildcardPoints(Tournament $tournament, array $podium, ?array $limitToIds = null): void
     {
         // Build teamId → points map from podium
         $pointsMap = [];
@@ -276,7 +313,12 @@ class TournamentAdminController extends Controller
             }
         }
 
-        $quinielaIds = Quiniela::where('tournament_id', $tournament->id)->pluck('id');
+        // Only process quinielas with wildcard enabled
+        $query = Quiniela::where('tournament_id', $tournament->id)->where('wildcard_enabled', true);
+        if ($limitToIds) {
+            $query->whereIn('id', $limitToIds);
+        }
+        $quinielaIds = $query->pluck('id');
 
         foreach (Wildcard::whereIn('quiniela_id', $quinielaIds)->get() as $wc) {
             $oldPoints = (int) ($wc->points_earned ?? 0);
