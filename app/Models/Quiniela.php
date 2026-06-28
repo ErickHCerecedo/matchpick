@@ -14,11 +14,11 @@ class Quiniela extends Model
 {
     use SoftDeletes;
 
-    protected $fillable = ['creator_id', 'tournament_id', 'name', 'slug', 'description', 'type', 'scoring_type', 'max_participants', 'is_active', 'predictions_open', 'wildcard_enabled'];
+    protected $fillable = ['creator_id', 'tournament_id', 'name', 'slug', 'description', 'type', 'scoring_type', 'max_participants', 'is_active', 'predictions_open', 'wildcard_enabled', 'penalties_enabled'];
 
     protected function casts(): array
     {
-        return ['is_active' => 'boolean', 'predictions_open' => 'boolean', 'wildcard_enabled' => 'boolean'];
+        return ['is_active' => 'boolean', 'predictions_open' => 'boolean', 'wildcard_enabled' => 'boolean', 'penalties_enabled' => 'boolean'];
     }
 
     public static function generateSlug(string $name): string

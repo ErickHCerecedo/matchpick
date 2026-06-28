@@ -152,6 +152,7 @@ class TournamentAdminController extends Controller
                 'slug'               => $q->slug,
                 'type'               => $q->type,
                 'wildcard_enabled'   => (bool) $q->wildcard_enabled,
+                'penalties_enabled'  => (bool) $q->penalties_enabled,
                 'participants_count' => $q->participants_count,
                 'creator'            => $q->creator
                     ? ['id' => $q->creator->id, 'name' => $q->creator->name, 'email' => $q->creator->email]
@@ -222,6 +223,17 @@ class TournamentAdminController extends Controller
         $tournament->update(['meta' => $meta]);
 
         return response()->json(['message' => 'Equipos del comodín actualizados.']);
+    }
+
+    /** PATCH /admin/quinielas/{quiniela}/penalties-enabled */
+    public function setQuinielaPenalties(Request $request, Quiniela $quiniela): JsonResponse
+    {
+        $validated = $request->validate(['enabled' => 'required|boolean']);
+        $quiniela->update(['penalties_enabled' => $validated['enabled']]);
+        return response()->json([
+            'message' => $validated['enabled'] ? 'Penales activados.' : 'Penales desactivados.',
+            'data'    => ['penalties_enabled' => $quiniela->penalties_enabled],
+        ]);
     }
 
     /** PATCH /admin/quinielas/{quiniela}/wildcard-enabled */
