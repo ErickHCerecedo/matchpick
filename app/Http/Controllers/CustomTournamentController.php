@@ -359,7 +359,13 @@ class CustomTournamentController extends Controller
                     'logo_url'   => $m->awayTeam->logo_url ?? $m->awayTeam->country?->flag_url,
                 ] : null,
                 'away_placeholder' => $m->away_placeholder,
-                'result'           => $m->result ? ['home_score' => $m->result->home_score, 'away_score' => $m->result->away_score, 'winner' => $m->result->winner] : null,
+                'result'           => $m->result ? [
+                    'home_score'           => $m->result->home_score,
+                    'away_score'           => $m->result->away_score,
+                    'winner'               => $m->result->winner,
+                    'home_score_penalties' => $m->result->home_score_penalties,
+                    'away_score_penalties' => $m->result->away_score_penalties,
+                ] : null,
             ]);
 
         return response()->json(['data' => $matches]);
@@ -395,26 +401,36 @@ class CustomTournamentController extends Controller
         }
 
         $request->validate([
-            'home_score' => 'required|integer|min:0',
-            'away_score' => 'required|integer|min:0',
+            'home_score'           => 'required|integer|min:0',
+            'away_score'           => 'required|integer|min:0',
+            'home_score_penalties' => 'nullable|integer|min:0|max:30',
+            'away_score_penalties' => 'nullable|integer|min:0|max:30',
         ]);
+
+        $hasPenalties = $request->home_score === $request->away_score
+            && $request->home_score_penalties !== null
+            && $request->away_score_penalties !== null;
 
         $existing = MatchResult::where('match_id', $matchId)->first();
 
         if ($existing) {
             $existing->update([
-                'home_score'   => $request->home_score,
-                'away_score'   => $request->away_score,
-                'confirmed_at' => now(),
+                'home_score'           => $request->home_score,
+                'away_score'           => $request->away_score,
+                'home_score_penalties' => $hasPenalties ? $request->home_score_penalties : null,
+                'away_score_penalties' => $hasPenalties ? $request->away_score_penalties : null,
+                'confirmed_at'         => now(),
             ]);
             RecalculateMatchScoresJob::dispatch($existing);
             $result = $existing;
         } else {
             $result = MatchResult::create([
-                'match_id'     => $matchId,
-                'home_score'   => $request->home_score,
-                'away_score'   => $request->away_score,
-                'confirmed_at' => now(),
+                'match_id'             => $matchId,
+                'home_score'           => $request->home_score,
+                'away_score'           => $request->away_score,
+                'home_score_penalties' => $hasPenalties ? $request->home_score_penalties : null,
+                'away_score_penalties' => $hasPenalties ? $request->away_score_penalties : null,
+                'confirmed_at'         => now(),
             ]);
             if ($match->status !== 'in_progress') {
                 $match->update(['status' => 'finished']);
@@ -424,9 +440,11 @@ class CustomTournamentController extends Controller
 
         return response()->json([
             'data'    => [
-                'home_score' => $result->home_score,
-                'away_score' => $result->away_score,
-                'winner'     => $result->winner,
+                'home_score'           => $result->home_score,
+                'away_score'           => $result->away_score,
+                'winner'               => $result->winner,
+                'home_score_penalties' => $result->home_score_penalties,
+                'away_score_penalties' => $result->away_score_penalties,
             ],
             'message' => 'Resultado guardado. Los puntajes se están calculando.',
         ]);

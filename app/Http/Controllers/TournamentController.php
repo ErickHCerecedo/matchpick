@@ -64,9 +64,11 @@ class TournamentController extends Controller
                         ] : null,
                         'away_placeholder'     => $match->away_placeholder,
                         'result'               => $match->result ? [
-                            'home_score' => $match->result->home_score,
-                            'away_score' => $match->result->away_score,
-                            'winner'     => $match->result->winner,
+                            'home_score'           => $match->result->home_score,
+                            'away_score'           => $match->result->away_score,
+                            'winner'               => $match->result->winner,
+                            'home_score_penalties' => $match->result->home_score_penalties,
+                            'away_score_penalties' => $match->result->away_score_penalties,
                         ] : null,
                     ];
                 }),
