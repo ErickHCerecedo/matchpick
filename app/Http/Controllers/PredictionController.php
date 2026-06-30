@@ -34,7 +34,13 @@ class PredictionController extends Controller
 
             $prediction = Prediction::updateOrCreate(
                 ['user_id' => $user->id, 'quiniela_id' => $quiniela->id, 'match_id' => $item['match_id']],
-                ['home_score' => $item['home_score'], 'away_score' => $item['away_score']]
+                [
+                    'home_score'       => $item['home_score'],
+                    'away_score'       => $item['away_score'],
+                    'penalties_winner' => $item['penalties_winner'] ?? null,
+                    'penalties_home'   => $item['penalties_home'] ?? null,
+                    'penalties_away'   => $item['penalties_away'] ?? null,
+                ]
             );
 
             // Update predictions_made counter in standings (only on create)
@@ -124,13 +130,18 @@ class PredictionController extends Controller
                         'flag_url'   => $match->awayTeam->country?->flag_url,
                     ] : null,
                     'result' => $match->result ? [
-                        'home_score' => $match->result->home_score,
-                        'away_score' => $match->result->away_score,
-                        'winner'     => $match->result->winner,
+                        'home_score'            => $match->result->home_score,
+                        'away_score'            => $match->result->away_score,
+                        'winner'                => $match->result->winner,
+                        'home_score_penalties'  => $match->result->home_score_penalties,
+                        'away_score_penalties'  => $match->result->away_score_penalties,
                     ] : null,
                     'prediction' => ($started && $prediction) ? [
-                        'home_score' => $prediction->home_score,
-                        'away_score' => $prediction->away_score,
+                        'home_score'       => $prediction->home_score,
+                        'away_score'       => $prediction->away_score,
+                        'penalties_winner' => $prediction->penalties_winner,
+                        'penalties_home'   => $prediction->penalties_home,
+                        'penalties_away'   => $prediction->penalties_away,
                     ] : null,
                     'score' => ($started && $prediction?->score) ? [
                         'points'    => $prediction->score->points,

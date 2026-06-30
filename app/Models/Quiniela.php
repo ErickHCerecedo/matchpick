@@ -14,7 +14,7 @@ class Quiniela extends Model
 {
     use SoftDeletes;
 
-    protected $fillable = ['creator_id', 'tournament_id', 'name', 'slug', 'description', 'type', 'scoring_type', 'max_participants', 'is_active', 'predictions_open', 'wildcard_enabled', 'penalties_enabled'];
+    protected $fillable = ['creator_id', 'tournament_id', 'name', 'slug', 'description', 'type', 'scoring_type', 'max_participants', 'is_active', 'predictions_open', 'wildcard_enabled', 'penalties_enabled', 'penalties_mode'];
 
     protected function casts(): array
     {

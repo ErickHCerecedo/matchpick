@@ -18,7 +18,7 @@ class CalculateScoresJob implements ShouldQueue
 
     public function handle(ScoringService $scoringService): void
     {
-        $predictions = Prediction::where('match_id', $this->matchResult->match_id)->get();
+        $predictions = Prediction::where('match_id', $this->matchResult->match_id)->with('quiniela')->get();
 
         foreach ($predictions as $prediction) {
             $result = $scoringService->calculate($prediction, $this->matchResult);

@@ -153,6 +153,7 @@ class TournamentAdminController extends Controller
                 'type'               => $q->type,
                 'wildcard_enabled'   => (bool) $q->wildcard_enabled,
                 'penalties_enabled'  => (bool) $q->penalties_enabled,
+                'penalties_mode'     => $q->penalties_mode,
                 'participants_count' => $q->participants_count,
                 'creator'            => $q->creator
                     ? ['id' => $q->creator->id, 'name' => $q->creator->name, 'email' => $q->creator->email]
@@ -228,11 +229,28 @@ class TournamentAdminController extends Controller
     /** PATCH /admin/quinielas/{quiniela}/penalties-enabled */
     public function setQuinielaPenalties(Request $request, Quiniela $quiniela): JsonResponse
     {
-        $validated = $request->validate(['enabled' => 'required|boolean']);
-        $quiniela->update(['penalties_enabled' => $validated['enabled']]);
+        $validated = $request->validate([
+            'enabled' => 'required|boolean',
+            'mode'    => 'nullable|in:winner,exact',
+        ]);
+
+        $update = ['penalties_enabled' => $validated['enabled']];
+        if (isset($validated['mode'])) {
+            $update['penalties_mode'] = $validated['mode'];
+        }
+        if (!$validated['enabled']) {
+            $update['penalties_mode'] = null;
+        }
+
+        $quiniela->update($update);
+        $quiniela->refresh();
+
         return response()->json([
             'message' => $validated['enabled'] ? 'Penales activados.' : 'Penales desactivados.',
-            'data'    => ['penalties_enabled' => $quiniela->penalties_enabled],
+            'data'    => [
+                'penalties_enabled' => $quiniela->penalties_enabled,
+                'penalties_mode'    => $quiniela->penalties_mode,
+            ],
         ]);
     }
 

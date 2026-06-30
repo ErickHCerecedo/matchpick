@@ -9,7 +9,7 @@ use App\Models\GameMatch;
 
 class Prediction extends Model
 {
-    protected $fillable = ['user_id', 'quiniela_id', 'match_id', 'home_score', 'away_score'];
+    protected $fillable = ['user_id', 'quiniela_id', 'match_id', 'home_score', 'away_score', 'penalties_winner', 'penalties_home', 'penalties_away'];
 
     public function user(): BelongsTo { return $this->belongsTo(User::class); }
     public function quiniela(): BelongsTo { return $this->belongsTo(Quiniela::class); }

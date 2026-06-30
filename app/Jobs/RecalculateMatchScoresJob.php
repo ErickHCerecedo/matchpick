@@ -24,7 +24,7 @@ class RecalculateMatchScoresJob implements ShouldQueue
 
     public function handle(ScoringService $scoringService): void
     {
-        $predictions = Prediction::where('match_id', $this->matchResult->match_id)->get();
+        $predictions = Prediction::where('match_id', $this->matchResult->match_id)->with('quiniela')->get();
 
         $affectedQuinielaIds = [];
 
