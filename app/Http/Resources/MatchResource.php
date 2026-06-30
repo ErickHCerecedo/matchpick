@@ -31,9 +31,11 @@ class MatchResource extends JsonResource
                 'flag_url' => $this->awayTeam->country?->flag_url,
             ]),
             'result' => $this->whenLoaded('result', fn() => $this->result ? [
-                'home_score' => $this->result->home_score,
-                'away_score' => $this->result->away_score,
-                'winner' => $this->result->winner,
+                'home_score'           => $this->result->home_score,
+                'away_score'           => $this->result->away_score,
+                'winner'               => $this->result->winner,
+                'home_score_penalties' => $this->result->home_score_penalties,
+                'away_score_penalties' => $this->result->away_score_penalties,
             ] : null),
         ];
     }

@@ -19,26 +19,37 @@ class MatchResultController extends Controller
     public function store(Request $request, GameMatch $match): JsonResponse
     {
         $request->validate([
-            'home_score' => 'required|integer|min:0',
-            'away_score' => 'required|integer|min:0',
+            'home_score'            => 'required|integer|min:0',
+            'away_score'            => 'required|integer|min:0',
+            'home_score_penalties'  => 'nullable|integer|min:0|max:30',
+            'away_score_penalties'  => 'nullable|integer|min:0|max:30',
         ]);
+
+        // Penalties only valid when main score is a draw
+        $hasPenalties = $request->home_score === $request->away_score
+            && $request->home_score_penalties !== null
+            && $request->away_score_penalties !== null;
 
         $existing = MatchResult::where('match_id', $match->id)->first();
 
         if ($existing) {
             $existing->update([
-                'home_score'   => $request->home_score,
-                'away_score'   => $request->away_score,
-                'confirmed_at' => now(),
+                'home_score'            => $request->home_score,
+                'away_score'            => $request->away_score,
+                'home_score_penalties'  => $hasPenalties ? $request->home_score_penalties : null,
+                'away_score_penalties'  => $hasPenalties ? $request->away_score_penalties : null,
+                'confirmed_at'          => now(),
             ]);
             RecalculateMatchScoresJob::dispatch($existing);
             $result = $existing;
         } else {
             $result = MatchResult::create([
-                'match_id'     => $match->id,
-                'home_score'   => $request->home_score,
-                'away_score'   => $request->away_score,
-                'confirmed_at' => now(),
+                'match_id'              => $match->id,
+                'home_score'            => $request->home_score,
+                'away_score'            => $request->away_score,
+                'home_score_penalties'  => $hasPenalties ? $request->home_score_penalties : null,
+                'away_score_penalties'  => $hasPenalties ? $request->away_score_penalties : null,
+                'confirmed_at'          => now(),
             ]);
             // Only mark finished if the match wasn't already set to in_progress by admin
             if ($match->status !== 'in_progress') {
