@@ -107,7 +107,7 @@ class AutoSyncWcMatches extends Command
             ->where(function ($q) use ($cutoff) {
                 $q->where('status', 'in_progress')
                   ->orWhere(function ($q2) use ($cutoff) {
-                      $q2->whereIn('status', ['scheduled', 'postponed'])
+                      $q2->where('status', 'scheduled')
                          ->where('scheduled_at', '<=', now())
                          ->where('scheduled_at', '>=', $cutoff);
                   });
